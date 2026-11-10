@@ -1,0 +1,464 @@
+.budde {
+  --budde-paper: var(--b3-theme-background, #fafaf8);
+  --budde-ink: var(--b3-theme-on-background, #292d29);
+  --budde-muted: var(--b3-theme-on-surface, #70756e);
+  --budde-line: var(--b3-border-color, rgba(100, 110, 100, 0.17));
+  --budde-inset: var(--b3-theme-surface, #f0f1ed);
+  --budde-sprout: var(--b3-theme-primary, #48735b);
+  --budde-on-sprout: var(--b3-theme-on-primary, #fff);
+  --budde-selected: var(--b3-theme-primary-lightest, #eaf0e8);
+  box-sizing: border-box;
+  color: var(--budde-ink);
+  background: var(--budde-paper);
+  font: 14px/20px var(--b3-font-family, system-ui, sans-serif);
+  height: 100%;
+  overflow: auto;
+  padding: 24px;
+  container-type: inline-size;
+  -webkit-font-smoothing: antialiased;
+}
+.budde * {
+  box-sizing: border-box;
+}
+.budde h1,
+.budde h2,
+.budde h3,
+.budde p {
+  margin: 0;
+  text-wrap: pretty;
+}
+.budde h1 {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+}
+.budde h2 {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.budde h3 {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+}
+.budde button,
+.budde input,
+.budde select,
+.budde textarea {
+  font: inherit;
+  color: inherit;
+  max-width: 100%;
+}
+.budde button {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--budde-line);
+  border-radius: 6px;
+  background: var(--budde-paper);
+  cursor: pointer;
+  font-weight: 500;
+}
+.budde button:hover {
+  background: var(--budde-inset);
+}
+.budde button:active {
+  transform: scale(0.98);
+}
+.budde button:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+}
+.budde input,
+.budde select,
+.budde textarea {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--budde-line);
+  border-radius: 6px;
+  background: var(--budde-inset);
+  width: 100%;
+  min-width: 0;
+}
+.budde textarea {
+  resize: vertical;
+}
+.budde :focus-visible {
+  outline: 2px solid var(--budde-sprout);
+  outline-offset: 2px;
+}
+.budde label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--budde-muted);
+}
+.budde .budde-primary {
+  color: var(--budde-on-sprout);
+  background: var(--budde-sprout);
+  border-color: transparent;
+}
+.budde .budde-primary:hover {
+  filter: brightness(0.95);
+}
+.budde-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.budde-header p {
+  color: var(--budde-muted);
+  font-size: 12px;
+  line-height: 16px;
+  margin-top: 4px;
+}
+.budde-header-actions,
+.budde-detail-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.budde-nav {
+  display: flex;
+  gap: 4px;
+  margin-top: 24px;
+}
+.budde-nav button {
+  border-color: transparent;
+}
+.budde-nav [aria-current="page"] {
+  background: var(--budde-selected);
+  color: var(--budde-sprout);
+}
+.budde-overview {
+  display: flex;
+  gap: 24px;
+  color: var(--budde-muted);
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  margin: 16px 0;
+}
+.budde-capture {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.budde-capture input {
+  flex: 1;
+}
+.budde-capture button {
+  flex-shrink: 0;
+}
+.budde-toolbar {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+}
+.budde-toolbar > label:first-child {
+  flex: 1;
+}
+.budde-toolbar > label:nth-child(2) {
+  min-width: 128px;
+}
+.budde .budde-check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  white-space: nowrap;
+}
+.budde-check input {
+  width: 16px;
+  min-height: 16px;
+  accent-color: var(--budde-sprout);
+}
+.budde-message {
+  font-size: 12px;
+  line-height: 16px;
+  min-height: 16px;
+  margin: 8px 0;
+  color: var(--budde-muted);
+}
+.budde-message[role="alert"] {
+  color: var(--b3-theme-error, #b44335);
+}
+.budde-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.budde-body.has-detail {
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+.budde-main {
+  min-width: 0;
+}
+.budde-list {
+  display: grid;
+  gap: 8px;
+}
+.budde-item {
+  padding: 12px 16px;
+  border: 1px solid var(--budde-line);
+  border-radius: 8px;
+  background: var(--budde-paper);
+  min-width: 0;
+}
+.budde-item.is-selected {
+  border-color: var(--budde-sprout);
+}
+.budde .budde-item-title {
+  display: block;
+  padding: 0;
+  min-height: 32px;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.budde-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--budde-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+.budde-next {
+  font-size: 12px;
+  line-height: 16px;
+  margin-top: 8px !important;
+  color: var(--budde-muted);
+  overflow-wrap: anywhere;
+}
+.budde-item-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+.budde .budde-stage-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+.budde-stage-label select {
+  font-size: 12px;
+  line-height: 16px;
+  min-height: 32px;
+  padding: 4px 8px;
+  width: auto;
+  min-width: 88px;
+}
+.budde-board-group {
+  margin-bottom: 24px;
+}
+.budde-board-group > h2 {
+  margin-bottom: 12px;
+}
+.budde-board-group h2 span,
+.budde-lane h3 span {
+  color: var(--budde-muted);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  margin-left: 8px;
+}
+.budde-lanes {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px 4px 12px;
+}
+.budde-lane {
+  min-width: 240px;
+  flex: 1;
+  background: var(--budde-inset);
+  padding: 12px;
+  border-radius: 8px;
+}
+.budde-lane h3 {
+  margin-bottom: 12px;
+}
+.budde-lane .budde-item {
+  margin-bottom: 8px;
+  padding: 12px;
+}
+.budde-lane-empty {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--budde-muted);
+  padding: 16px 0;
+}
+.budde-empty {
+  padding: 48px 24px;
+  color: var(--budde-muted);
+  text-align: center;
+}
+.budde-empty strong {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500;
+  color: var(--budde-ink);
+}
+.budde-empty p {
+  margin-top: 8px;
+}
+.budde-detail {
+  background: var(--budde-paper);
+  border: 1px solid var(--budde-line);
+  border-radius: 8px;
+  padding: 16px;
+  min-width: 0;
+}
+.budde-detail-heading {
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.budde-draft-status,
+.budde-hint {
+  color: var(--budde-muted);
+  font-size: 12px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+  margin-bottom: 12px !important;
+}
+.budde-detail form {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0;
+}
+.budde-field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.budde-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.budde-links {
+  margin-top: 24px;
+}
+.budde-links h3 {
+  margin-bottom: 8px;
+}
+.budde-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.budde-link > button:first-child {
+  flex: 1;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.budde-detail > .budde-hint {
+  margin-top: 16px !important;
+}
+.budde-settings {
+  color: var(--budde-ink);
+  background: var(--budde-paper);
+  border: 1px solid var(--budde-line);
+  border-radius: 12px;
+  padding: 24px;
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+}
+.budde-settings::backdrop {
+  background: rgba(0, 0, 0, 0.25);
+}
+.budde-settings form {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+  margin: 16px 0;
+}
+.budde-settings form > label:first-child {
+  flex: 1;
+}
+.budde-stage-settings form {
+  flex-wrap: wrap;
+  background: var(--budde-inset);
+  padding: 12px;
+  border-radius: 8px;
+}
+.budde-stage-settings input[name="name"] {
+  flex: 1;
+  min-width: 128px;
+}
+.budde-stage-settings select {
+  width: 128px;
+}
+.budde-sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+.budde-loading {
+  height: 128px;
+  background: var(--budde-inset);
+  border-radius: 8px;
+  padding: 24px;
+  color: var(--budde-muted);
+}
+@container (max-width:800px) {
+  .budde-body.has-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .budde-detail {
+    grid-row: 1;
+  }
+  .budde-header {
+    align-items: start;
+  }
+  .budde-header-actions {
+    flex-wrap: wrap;
+    justify-content: end;
+  }
+  .budde-header-actions button {
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .budde-toolbar {
+    flex-wrap: wrap;
+  }
+  .budde-toolbar > label:first-child {
+    flex-basis: 100%;
+  }
+}
+@media (max-width: 500px) {
+  .budde {
+    padding: 16px;
+  }
+  .budde-header {
+    flex-direction: column;
+  }
+  .budde-header-actions {
+    justify-content: start;
+  }
+  .budde-settings {
+    padding: 16px;
+  }
+  .budde-nav {
+    margin-top: 16px;
+  }
+  .budde-overview {
+    gap: 16px;
+  }
+}

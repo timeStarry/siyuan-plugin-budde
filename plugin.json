@@ -1,0 +1,14 @@
+{
+  "name": "siyuan-plugin-budde",
+  "author": "timeStarry",
+  "url": "https://github.com/timeStarry",
+  "version": "0.1.0-alpha.1",
+  "minAppVersion": "3.4.1",
+  "backends": ["windows", "linux", "darwin"],
+  "frontends": ["desktop", "desktop-window"],
+  "disabledInPublish": true,
+  "displayName": { "default": "Budde", "zh_CN": "Budde" },
+  "description": { "default": "A lightweight idea pool and lifecycle board inside SiYuan.", "zh_CN": "思源里的轻量想法池与生命周期看板。先记标题，想推进时再展开。" },
+  "readme": { "default": "README.md", "zh_CN": "README.md" },
+  "keywords": ["想法池", "看板", "生命周期", "idea", "kanban"]
+}

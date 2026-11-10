@@ -1,0 +1,23 @@
+{
+  "name": "siyuan-plugin-budde",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "description": "Budde：思源里的轻量想法池与生命周期看板",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "test:ui": "node scripts/verify-ui.mjs",
+    "test:plugin": "node scripts/smoke-plugin.mjs",
+    "check": "pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.25.0",
+    "siyuan": "1.1.5",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "@playwright/test": "^1.55.0"
+  }
+}
