@@ -1,5 +1,6 @@
 import { build } from "esbuild";
 import { mkdir, copyFile } from "node:fs/promises";
+import { buddeCssPlugin } from "./css.mjs";
 await mkdir("dist/i18n", { recursive: true });
 await build({
   entryPoints: ["src/index.ts"],
@@ -9,6 +10,8 @@ await build({
   platform: "node",
   target: "chrome120",
   external: ["siyuan", "node:*"],
+  plugins: [buddeCssPlugin()],
+  define: { "process.env.NODE_ENV": '"production"' },
   sourcemap: false,
   minify: false,
   charset: "utf8",

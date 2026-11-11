@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; font-src 'none'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Budde · 阅读侧栏视觉草图</title>
+<style id="budde-tokens">
+:root {
+  /* Primitive: neutral palette, space, type, geometry. */
+  --p-canvas:#f5f5f5; --p-surface:#fff; --p-subtle:#ededed;
+  --p-text:#262626; --p-muted:#666; --p-line:#dedede; --p-control-line:#8a8a8a;
+  --p-accent:#262626; --p-on-accent:#fff; --p-selected:#e9e9e9;
+  --p-hover:#ededed; --p-pressed:#e0e0e0; --p-attention:#595959;
+  --p-scrim:rgb(0 0 0 / 14%); --p-shadow:rgb(0 0 0 / 12%);
+  --p-space-1:4px; --p-space-2:8px; --p-space-3:12px; --p-space-4:16px;
+  --p-space-5:20px; --p-space-6:24px; --p-space-8:32px; --p-space-12:48px;
+  --p-font-xs:12px; --p-font-sm:13px; --p-font-md:14px; --p-font-lg:18px; --p-font-xl:20px;
+  --p-line-xs:16px; --p-line-sm:20px; --p-line-md:24px; --p-line-xl:28px;
+  --p-weight-regular:400; --p-weight-medium:500; --p-weight-strong:600;
+  --p-radius-sm:4px; --p-radius-md:6px; --p-radius-lg:8px;
+  --p-border:1px; --p-focus:2px; --p-control:36px; --p-icon:16px; --p-brand-icon:24px;
+  --p-duration-fast:120ms; --p-duration-panel:160ms; --p-ease-out:cubic-bezier(.16,1,.3,1);
+  /* Semantic: host typography/surfaces are respected, colored primary is not. */
+  --c-canvas:var(--b3-theme-surface,var(--p-canvas));
+  --c-surface:var(--b3-theme-background,var(--p-surface));
+  --c-subtle:var(--p-subtle);
+  --c-text:var(--b3-theme-on-background,var(--p-text));
+  --c-muted:var(--b3-theme-on-surface,var(--p-muted));
+  --c-line:var(--b3-border-color,var(--p-line));
+  --c-control-line:var(--p-control-line);
+  --c-accent:var(--b3-theme-on-background,var(--p-accent));
+  --c-on-accent:var(--b3-theme-background,var(--p-on-accent));
+  --c-selected:var(--p-selected); --c-hover:var(--p-hover); --c-pressed:var(--p-pressed);
+  --c-warning:var(--p-attention); --c-disabled-text:var(--c-muted); --c-disabled-bg:var(--c-subtle);
+  --c-primary-hover:color-mix(in srgb,var(--c-accent) 85%,var(--c-surface));
+  --c-primary-pressed:color-mix(in srgb,var(--c-accent) 70%,var(--c-surface));
+  --font-family:var(--b3-font-family,"Segoe UI","Microsoft YaHei",system-ui,sans-serif);
+  --font-meta:var(--p-font-xs); --line-meta:var(--p-line-xs);
+  --font-card:var(--p-font-sm); --line-label:var(--p-line-sm);
+  --font-control:var(--p-font-sm); --line-control:var(--p-line-sm);
+  --font-body:var(--p-font-md); --line-body:var(--p-line-md);
+  --font-title:var(--p-font-xl); --line-title:var(--p-line-xl);
+  --font-brand:var(--p-font-lg); --line-brand:var(--p-line-md);
+  --weight-regular:var(--p-weight-regular); --weight-medium:var(--p-weight-medium); --weight-strong:var(--p-weight-strong);
+  --s-1:var(--p-space-1); --s-2:var(--p-space-2); --s-3:var(--p-space-3); --s-4:var(--p-space-4);
+  --s-5:var(--p-space-5); --s-6:var(--p-space-6); --s-8:var(--p-space-8); --s-12:var(--p-space-12);
+  --border-width:var(--p-border); --focus-width:var(--p-focus); --focus-offset:var(--p-focus);
+  --duration-fast:var(--p-duration-fast); --duration-panel:var(--p-duration-panel); --ease-out:var(--p-ease-out);
+  /* Component contracts: never override per-region control dimensions. */
+  --control-height:var(--p-control); --control-min-width:64px; --control-primary-min-width:80px;
+  --control-padding-x:var(--s-3); --control-gap:var(--s-2);
+  --r-control:var(--p-radius-md); --r-card:var(--p-radius-lg); --r-badge:var(--p-radius-sm);
+  --icon-size:var(--p-icon); --icon-stroke:1.75; --brand-icon-size:var(--p-brand-icon);
+  --card-min-height:80px; --note-min-height:56px;
+  --layout-header:64px; --layout-capture:80px; --layout-capture-surface:56px;
+  --layout-toolbar:56px; --layout-footer:64px; --layout-preview:48px;
+  --layout-index:144px; --layout-gap:var(--s-6); --layout-gutter:var(--s-6); --layout-search:192px;
+  --detail-width:420px; --stage-min:184px; --path-step:80px; --path-point:20px;
+  --path-dot:var(--s-1); --path-dot-current:var(--s-2);
+  --elevation-panel:-8px 0 32px var(--p-shadow); --elevation-notice:0 4px 16px var(--p-shadow);
+  --layer-scrim:2; --layer-panel:3; --layer-notice:5;
+  color-scheme:light;
+}
+:root[data-theme="dark"] {
+  --p-canvas:#1b1b1b; --p-surface:#232323; --p-subtle:#2d2d2d;
+  --p-text:#e9e9e9; --p-muted:#b0b0b0; --p-line:#434343; --p-control-line:#7d7d7d;
+  --p-accent:#ebebeb; --p-on-accent:#1b1b1b; --p-selected:#353535;
+  --p-hover:#303030; --p-pressed:#3b3b3b; --p-attention:#c2c2c2;
+  --p-scrim:rgb(0 0 0 / 36%); --p-shadow:rgb(0 0 0 / 24%);
+  color-scheme:dark;
+}
+</style>
+<style id="budde-components">
+* { box-sizing:border-box; scrollbar-width:thin; scrollbar-color:var(--c-control-line) transparent; }
+[hidden] { display:none!important; }
+html { font:var(--weight-regular) var(--font-body)/var(--line-body) var(--font-family); color:var(--c-text); background:var(--c-canvas); }
+body { margin:0; }
+::selection { background:var(--c-accent); color:var(--c-on-accent); }
+:focus-visible { outline:var(--focus-width) solid var(--c-accent); outline-offset:var(--focus-offset); }
+button { font:inherit; color:inherit; border:0; background:transparent; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+button:disabled { cursor:not-allowed; }
+.icon { width:var(--icon-size); height:var(--icon-size); flex:none; fill:none; stroke:currentColor; stroke-width:var(--icon-stroke); stroke-linecap:round; stroke-linejoin:round; vertical-align:middle; }
+.sprite { position:absolute; width:0; height:0; overflow:hidden; }
+.muted { color:var(--c-muted); }
+.button { height:var(--control-height); min-height:var(--control-height); min-width:var(--control-min-width); flex:none; display:inline-flex; align-items:center; justify-content:center; gap:var(--control-gap); padding:0 var(--control-padding-x); white-space:nowrap; border:var(--border-width) solid var(--c-control-line); border-radius:var(--r-control); background:var(--c-surface); font:var(--weight-medium) var(--font-control)/var(--line-control) var(--font-family); transition:background-color var(--duration-fast),border-color var(--duration-fast),color var(--duration-fast); }
+.button:not(:disabled):hover { color:var(--c-text); background:var(--c-hover); border-color:var(--c-muted); }
+.button:not(:disabled):active { background:var(--c-pressed); border-color:var(--c-text); }
+.button.primary { min-width:var(--control-primary-min-width); background:var(--c-accent); border-color:var(--c-accent); color:var(--c-on-accent); }
+.button.primary:not(:disabled):hover { background:var(--c-primary-hover); border-color:var(--c-accent); color:var(--c-on-accent); }
+.button.primary:not(:disabled):active { background:var(--c-primary-pressed); }
+.button.ghost { background:transparent; border-color:transparent; color:var(--c-muted); }
+.button.ghost:not(:disabled):hover { background:var(--c-hover); border-color:transparent; color:var(--c-text); }
+.button.ghost:not(:disabled):active { background:var(--c-pressed); }
+.button:is(.is-active,[aria-pressed="true"]) { background:var(--c-selected); color:var(--c-accent); font-weight:var(--weight-strong); }
+.button:disabled { color:var(--c-disabled-text); background:var(--c-disabled-bg); border-color:var(--c-line); }
+.button.icon-button { width:var(--control-height); min-width:var(--control-height); padding:0; }
+.item-card { position:relative; display:block; width:100%; min-height:var(--card-min-height); text-align:left; padding:var(--s-3); border:var(--border-width) solid var(--c-line); border-radius:var(--r-card); background:var(--c-surface); transition:border-color var(--duration-fast),background-color var(--duration-fast); }
+.item-card:hover { border-color:var(--c-control-line); }
+.item-card.selected { background:var(--c-selected); border-color:var(--c-accent); }
+.card-title { display:block; font:var(--weight-medium) var(--font-card)/var(--line-label) var(--font-family); padding-right:var(--s-4); overflow-wrap:anywhere; }
+.card-menu { position:absolute; top:var(--s-3); right:var(--s-2); color:var(--c-muted); }
+.card-meta { display:flex; align-items:center; gap:var(--s-1); margin-top:var(--s-2); font:var(--weight-regular) var(--font-meta)/var(--line-meta) var(--font-family); color:var(--c-muted); }
+.card-note { color:var(--c-muted); margin:var(--s-2) 0 0; font:var(--weight-regular) var(--font-meta)/var(--line-meta) var(--font-family); }
+.review-mark { display:inline-flex; align-items:center; gap:var(--s-1); font:var(--weight-regular) var(--font-meta)/var(--line-meta) var(--font-family); color:var(--c-warning); margin-top:var(--s-2); }
+.note-link { width:100%; min-height:var(--note-min-height); display:flex; align-items:center; text-align:left; gap:var(--s-3); padding:var(--s-2); border:var(--border-width) solid transparent; border-radius:var(--r-control); }
+.note-link:hover { background:var(--c-hover); }
+.note-link:hover .note-name { text-decoration:underline; text-underline-offset:var(--s-1); }
+.item-card:active,.note-link:active { background:var(--c-pressed); }
+.note-link > .icon { color:var(--c-muted); }
+.note-text { display:flex; flex-direction:column; min-width:0; gap:var(--s-1); }
+.note-name { font:var(--weight-medium) var(--font-card)/var(--line-label) var(--font-family); overflow-wrap:anywhere; }
+.note-role { font:var(--weight-regular) var(--font-meta)/var(--line-meta) var(--font-family); color:var(--c-muted); }
+.note-link > .open-icon { margin-left:auto; }
+@media (prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none!important; animation:none!important; scroll-behavior:auto!important; } }
+</style>
+<style id="budde-layout">
+html,body { height:100%; }
+body { overflow:hidden; }
+.app { position:relative; height:100dvh; display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:var(--layout-header) var(--layout-capture) minmax(0,1fr) var(--layout-preview); }
+.app-header { display:flex; align-items:center; padding:0 var(--layout-gutter); gap:var(--layout-gap); background:var(--c-surface); border-bottom:var(--border-width) solid var(--c-line); }
+.brand { width:var(--layout-index); flex:none; display:flex; align-items:center; gap:var(--s-2); font:var(--weight-strong) var(--font-brand)/var(--line-brand) var(--font-family); }
+.brand .icon { width:var(--brand-icon-size); height:var(--brand-icon-size); color:var(--c-accent); }
+.main-nav,.header-actions,.theme-controls { display:flex; align-items:center; gap:var(--s-2); }
+.header-actions { margin-left:auto; }
+.capture-area { padding:var(--s-3) var(--layout-gutter); background:var(--c-canvas); }
+.capture { height:var(--layout-capture-surface); display:flex; align-items:center; gap:var(--s-3); padding:0 var(--s-2) 0 var(--s-4); border:var(--border-width) solid var(--c-control-line); background:var(--c-surface); border-radius:var(--r-card); }
+.capture > .icon { color:var(--c-accent); }
+.capture-prompt { flex:1; min-width:0; color:var(--c-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.capture-type { display:flex; align-items:center; gap:var(--s-2); padding-right:var(--s-3); border-right:var(--border-width) solid var(--c-line); font:var(--weight-regular) var(--font-meta)/var(--line-meta) var(--font-family); color:var(--c-muted); white-space:nowrap; }
+.workspace { display:flex; min-width:0; min-height:0; position:relative; overflow:hidden; }
+.board-area { flex:1; min-width:0; min-height:0; display:grid; grid-template-columns:var(--layout-index) minmax(0,1fr); gap:var(--layout-gap); padding:var(--s-2) var(--layout-gutter) var(--s-6); }
+.type-index { min-width:0; display:flex; flex-direction:column; }
+.index-heading { height:var(--layout-toolbar); flex:none; margin:0; display:flex; align-items:center; padding:0 var(--s-3); color:var(--c-muted); font:var(--weight-regular) var(--font-meta)/var(--line-meta) var(--font-family); }
+.type-list { display:grid; gap:var(--s-2); }
+.type-item { justify-content:flex-start; text-align:left; }
+.count,.position { font-variant-numeric:tabular-nums; }
+.type-item .count { margin-left:auto; font:var(--weight-regular) var(--font-meta)/var(--line-meta) var(--font-family); color:var(--c-muted); }
+.manage-types { margin-top:var(--s-6); border-top:var(--border-width) solid var(--c-line); padding-top:var(--s-3); }
+.manage-types .button { width:100%; justify-content:flex-start; }
+.board-main { display:flex; flex-direction:column; min-height:0; min-width:0; }
+.board-toolbar { display:flex; align-items:center; justify-content:space-between; gap:var(--s-4); height:var(--layout-toolbar); flex:none; }
+.board-title { display:flex; align-items:baseline; gap:var(--s-3); min-width:0; }
+h1,.detail-title { font:var(--weight-strong) var(--font-title)/var(--line-title) var(--font-family); margin:0; overflow-wrap:anywhere; }
+.board-title .count { color:var(--c-muted); font:var(--weight-regular) var(--font-meta)/var(--line-meta) var(--font-family); white-space:nowrap; }
+.search { width:var(--layout-search); justify-content:flex-start; color:var(--c-muted); }
+.board-scroll { min-height:0; min-width:0; overflow:auto; flex:1; padding:var(--s-1) var(--s-1) var(--s-3); }
+.board { display:grid; grid-template-columns:repeat(4,minmax(var(--stage-min),1fr)); gap:var(--s-3); min-height:100%; align-items:start; }
+.stage { min-width:0; }
+.stage-heading { display:flex; align-items:center; gap:var(--s-2); min-height:var(--control-height); padding:0 var(--s-1) var(--s-2); margin-bottom:var(--s-2); border-bottom:var(--border-width) solid var(--c-line); }
+.stage-heading > .icon { color:var(--c-muted); }
+.stage-heading h2 { font:var(--weight-medium) var(--font-card)/var(--line-label) var(--font-family); margin:0; }
+.stage-heading .count,.complete-tag { color:var(--c-muted); font:var(--weight-regular) var(--font-meta)/var(--line-meta) var(--font-family); }
+.complete-tag { margin-left:auto; }
+.cards { display:grid; gap:var(--s-2); }
+.board-hint { display:flex; align-items:center; gap:var(--s-2); margin:var(--s-3) 0 0; font:var(--weight-regular) var(--font-meta)/var(--line-meta) var(--font-family); color:var(--c-muted); }
+.scrim { display:none; }
+.detail { width:var(--detail-width); flex:none; background:var(--c-surface); border-left:var(--border-width) solid var(--c-line); display:flex; flex-direction:column; min-height:0; }
+.detail-toolbar { flex:none; height:var(--layout-toolbar); display:flex; align-items:center; gap:var(--s-2); padding:0 var(--layout-gutter); border-bottom:var(--border-width) solid var(--c-line); }
+.detail-toolbar-label { color:var(--c-muted); font:var(--weight-regular) var(--font-meta)/var(--line-meta) var(--font-family); margin-right:auto; display:flex; align-items:center; gap:var(--s-2); }
+.detail-content { padding:var(--s-6); min-height:0; overflow:auto; flex:1; }
+.item-context { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2); margin-top:var(--s-3); font:var(--weight-regular) var(--font-meta)/var(--line-meta) var(--font-family); color:var(--c-muted); }
+.type-label,.status-label,.review-status { display:inline-flex; align-items:center; gap:var(--s-1); }
+.type-label { padding-right:var(--s-2); border-right:var(--border-width) solid var(--c-line); }
+.status-label { color:var(--c-accent); }
+.review-status { color:var(--c-warning); }
+.section-title { display:flex; align-items:center; justify-content:space-between; gap:var(--s-2); margin:0 0 var(--s-3); font:var(--weight-medium) var(--font-card)/var(--line-label) var(--font-family); }
+.section-title .position { color:var(--c-muted); font:var(--weight-regular) var(--font-meta)/var(--line-meta) var(--font-family); }
+.stage-section { margin-top:var(--s-8); padding-bottom:var(--s-6); border-bottom:var(--border-width) solid var(--c-line); }
+.path-scroll { overflow:auto; padding:var(--s-1); }
+.stage-path { display:flex; min-width:calc(var(--path-step) * 4); list-style:none; margin:0; padding:0; }
+.path-node { position:relative; flex:1; min-width:var(--path-step); display:flex; flex-direction:column; align-items:center; text-align:center; font:var(--weight-regular) var(--font-meta)/var(--line-meta) var(--font-family); color:var(--c-muted); }
+.path-node:not(:last-child)::after { content:""; position:absolute; top:calc(var(--path-point) / 2); left:calc(50% + var(--path-point) / 2 + var(--s-1)); width:calc(100% - var(--path-point) - var(--s-2)); height:var(--border-width); background:var(--c-line); }
+.path-point { display:flex; align-items:center; justify-content:center; width:var(--path-point); height:var(--path-point); position:relative; border:var(--border-width) solid var(--c-line); border-radius:50%; background:var(--c-surface); flex:none; }
+.path-point::before { content:""; width:var(--path-dot); height:var(--path-dot); border-radius:50%; background:var(--c-muted); }
+.path-label { margin-top:var(--s-2); white-space:nowrap; }
+.path-caption { margin-top:var(--s-1); min-height:var(--line-label); padding:0 var(--s-1); }
+.path-node.current { color:var(--c-accent); }
+.path-node.current .path-point { border-color:var(--c-accent); background:var(--c-selected); }
+.path-node.current .path-point::before { width:var(--path-dot-current); height:var(--path-dot-current); background:var(--c-accent); }
+.path-node.current .path-label { font-weight:var(--weight-strong); }
+.path-node.current .path-caption { background:var(--c-selected); border-radius:var(--r-badge); }
+.read-section { margin-top:var(--s-6); }
+.next-step { display:flex; align-items:flex-start; gap:var(--s-3); padding:var(--s-4); border-radius:var(--r-control); background:var(--c-canvas); }
+.next-step .icon { color:var(--c-accent); margin-top:var(--s-1); }
+.next-step p { margin:0; }
+.description p { margin:0 0 var(--s-3); }
+.description p:last-child { margin-bottom:0; }
+.detail-bottom { min-height:var(--layout-footer); padding:var(--s-3) var(--layout-gutter); border-top:var(--border-width) solid var(--c-line); display:flex; align-items:center; gap:var(--s-2); flex:none; }
+.detail-bottom .icon-button { margin-left:auto; }
+.preview-bar { height:var(--layout-preview); flex:none; display:flex; align-items:center; justify-content:space-between; gap:var(--s-3); padding:0 var(--layout-gutter); background:var(--c-surface); border-top:var(--border-width) solid var(--c-line); font:var(--weight-regular) var(--font-meta)/var(--line-meta) var(--font-family); color:var(--c-muted); }
+.preview-caption { display:flex; align-items:center; gap:var(--s-2); min-width:0; }
+.preview-caption span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.toast { position:fixed; bottom:calc(var(--layout-preview) + var(--s-4)); left:50%; transform:translateX(-50%); width:max-content; max-width:calc(100vw - var(--s-8)); padding:var(--s-3) var(--s-4); background:var(--c-text); color:var(--c-surface); font:var(--weight-regular) var(--font-meta)/var(--line-meta) var(--font-family); border-radius:var(--r-card); z-index:var(--layer-notice); box-shadow:var(--elevation-notice); }
+@media (max-width:1199px) {
+  .workspace { position:static; }
+  .detail { position:absolute; z-index:var(--layer-panel); right:0; top:0; bottom:0; box-shadow:var(--elevation-panel); }
+  .scrim { display:block; position:absolute; z-index:var(--layer-scrim); inset:0; background:var(--p-scrim); }
+}
+@media (max-width:719px) {
+  .app { grid-template-rows:calc(var(--control-height) * 2 + var(--s-6)) var(--layout-capture) minmax(0,1fr) var(--layout-preview); }
+  .app-header { padding:var(--s-2) var(--s-4); gap:var(--s-2); flex-wrap:wrap; align-content:space-between; }
+  .brand { width:auto; }
+  .main-nav { order:3; width:100%; min-width:0; overflow:auto; }
+  .nav-button { flex:1 0 auto; }
+  .header-actions { gap:var(--s-2); }
+  .capture-area { padding-left:var(--s-4); padding-right:var(--s-4); }
+  .capture-type { display:none; }
+  .search { width:auto; }
+  .board-area { grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); gap:var(--s-2); padding:0 var(--s-4) var(--s-4); }
+  .type-index { flex-direction:row; align-items:center; }
+  .index-heading,.manage-types { display:none; }
+  .type-list { display:flex; overflow:auto; width:100%; padding:var(--s-1); }
+  .type-item .count { margin-left:var(--s-2); }
+  .detail { width:100%; border-left:0; box-shadow:none; }
+  .preview-caption > .icon { display:none; }
+}
+@media (max-width:359px) {
+  .detail-toolbar-label .icon { display:none; }
+  .detail-toolbar,.detail-content,.detail-bottom,.preview-bar { padding-left:var(--s-4); padding-right:var(--s-4); }
+}
+</style>
+</head>
+<body>
+<svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+<symbol id="i-sprout" viewBox="0 0 24 24"><path d="M12 21v-9M12 14C5 14 3 10 3 5c6 0 9 3 9 9Zm0-3C12 5 16 2 22 2c0 6-4 10-10 9Z"/></symbol>
+<symbol id="i-pool" viewBox="0 0 24 24"><path d="M4 7h16v13H4zM4 14h5l2 3h2l2-3h5M8 3h8"/></symbol>
+<symbol id="i-board" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16M6 8h0M12 8h0M18 8h0"/></symbol>
+<symbol id="i-active" viewBox="0 0 24 24"><path d="m13 3-9 11h7l-1 7 10-12h-7l1-6"/></symbol>
+<symbol id="i-archive" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="5" rx="1"/><path d="M5 8v13h14V8M9 12h6"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
+<symbol id="i-note" viewBox="0 0 24 24"><path d="M14 3H5v18h14V8Zm0 0v5h5M8 12h8M8 16h6"/></symbol>
+<symbol id="i-code" viewBox="0 0 24 24"><path d="m8 6-6 6 6 6m8-12 6 6-6 6M14 3l-4 18"/></symbol>
+<symbol id="i-plane" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4 20-7ZM22 2 11 13"/></symbol>
+<symbol id="i-shapes" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><circle cx="17" cy="7" r="4"/><path d="m7 14 4 7H3l4-7Zm7 0h7v7h-7z"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M9 15v6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+<symbol id="i-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/></symbol>
+<symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-build" viewBox="0 0 24 24"><path d="m8 3 3 3-5 5-3-3 5-5Zm3 3 9 9-5 5-9-9M13 13l7 7"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="m10 13 4-4M8 15l-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0M16 9l1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0" transform="translate(0 -1)"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="m15 4 5 5M3 21l5-1L21 7a2 2 0 0 0-5-5L3 15v6Z"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+<symbol id="i-open" viewBox="0 0 24 24"><path d="M14 3h7v7m0-7L10 14M9 3H3v18h18v-6"/></symbol>
+<symbol id="i-grip" viewBox="0 0 24 24"><path d="M9 5h0m0 7h0m0 7h0M15 5h0m0 7h0m0 7h0"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h0"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14A9 9 0 0 1 10 3a9 9 0 1 0 10 11Z"/></symbol>
+</defs></svg>
+<div class="app">
+<header class="app-header" id="app-header">
+  <div class="brand"><svg class="icon" aria-hidden="true"><use href="#i-sprout"/></svg>Budde</div>
+  <nav class="main-nav" aria-label="工作台视图">
+    <button class="button ghost nav-button" data-static><svg class="icon" aria-hidden="true"><use href="#i-pool"/></svg>想法池</button>
+    <button class="button ghost nav-button is-active" data-static aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-board"/></svg>看板</button>
+    <button class="button ghost nav-button" data-static><svg class="icon" aria-hidden="true"><use href="#i-active"/></svg>正在推进</button>
+  </nav>
+  <div class="header-actions"><button class="button ghost" data-static><svg class="icon" aria-hidden="true"><use href="#i-archive"/></svg>归档</button><button class="button ghost icon-button" data-static aria-label="更多操作"><svg class="icon" aria-hidden="true"><use href="#i-more"/></svg></button></div>
+</header>
+<section class="capture-area" aria-label="快速记录" id="capture-area">
+  <div class="capture"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span class="capture-prompt">记下一个想法，标题就够了</span><span class="capture-type">新事项类型 <button class="button ghost" data-static>通用<svg class="icon" aria-hidden="true"><use href="#i-down"/></svg></button></span><button class="button primary" data-static>记下来</button></div>
+</section>
+<div class="workspace">
+  <main class="board-area" id="board-area">
+    <aside class="type-index" aria-label="事项类型"><h2 class="index-heading">按类型查看</h2><div class="type-list">
+      <button class="button ghost type-item" data-static><svg class="icon" aria-hidden="true"><use href="#i-shapes"/></svg>通用<span class="count">2</span></button>
+      <button class="button ghost type-item" data-static><svg class="icon" aria-hidden="true"><use href="#i-note"/></svg>文章<span class="count">3</span></button>
+      <button class="button ghost type-item is-active" data-static aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="#i-code"/></svg>软件<span class="count">5</span></button>
+      <button class="button ghost type-item" data-static><svg class="icon" aria-hidden="true"><use href="#i-plane"/></svg>旅行<span class="count">2</span></button>
+    </div><div class="manage-types"><button class="button ghost" data-static><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg>管理类型与阶段</button></div></aside>
+    <section class="board-main" aria-label="软件看板">
+      <div class="board-toolbar"><div class="board-title"><h1>软件</h1><span class="count">5 个事项</span></div><button class="button search" data-static aria-label="搜索事项标题"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>搜索事项标题</button></div>
+      <div class="board-scroll" tabindex="0" aria-label="可横向滚动的阶段看板"><div class="board">
+        <section class="stage" aria-label="想法阶段"><div class="stage-heading"><svg class="icon" aria-hidden="true"><use href="#i-circle"/></svg><h2>想法</h2><span class="count">2</span></div><div class="cards">
+          <button class="item-card" data-static><span class="card-title">让订阅内容可以稍后再读</span><svg class="icon card-menu" aria-hidden="true"><use href="#i-more"/></svg><span class="card-meta"><svg class="icon" aria-hidden="true"><use href="#i-pause"/></svg>已暂停</span></button>
+          <button class="item-card" data-static><span class="card-title">做一个简洁的阅读计时器</span><svg class="icon card-menu" aria-hidden="true"><use href="#i-more"/></svg></button>
+        </div></section>
+        <section class="stage" aria-label="验证阶段"><div class="stage-heading"><svg class="icon" aria-hidden="true"><use href="#i-target"/></svg><h2>验证</h2><span class="count">1</span></div><div class="cards">
+          <button class="item-card selected" id="selected-card" aria-label="查看详情：给照片做一个本地整理工具" aria-expanded="true" aria-controls="detail"><span class="card-title">给照片做一个本地整理工具</span><svg class="icon card-menu" aria-hidden="true"><use href="#i-more"/></svg><span class="review-mark"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>需复查</span><p class="card-note">画出导入后第一次整理的界面</p><span class="card-meta"><svg class="icon" aria-hidden="true"><use href="#i-link"/></svg>1 条关联笔记</span></button>
+        </div></section>
+        <section class="stage" aria-label="开发阶段"><div class="stage-heading"><svg class="icon" aria-hidden="true"><use href="#i-build"/></svg><h2>开发</h2><span class="count">1</span></div><div class="cards">
+          <button class="item-card" data-static><span class="card-title">把常用命令放在一个地方</span><svg class="icon card-menu" aria-hidden="true"><use href="#i-more"/></svg><p class="card-note">试用一次键盘搜索流程</p></button>
+        </div></section>
+        <section class="stage" aria-label="已发布阶段"><div class="stage-heading"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><h2>已发布</h2><span class="count">1</span><span class="complete-tag">完成</span></div><div class="cards">
+          <button class="item-card" data-static><span class="card-title">让清单导出更省心</span><svg class="icon card-menu" aria-hidden="true"><use href="#i-more"/></svg><span class="card-meta"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>已完成</span></button>
+        </div></section>
+      </div></div>
+      <p class="board-hint"><svg class="icon" aria-hidden="true"><use href="#i-grip"/></svg>拖动卡片调整阶段，也可以在详情中修改</p>
+    </section>
+  </main>
+  <div class="scrim" id="scrim" aria-hidden="true"></div>
+  <aside class="detail" id="detail" aria-label="事项详情" tabindex="-1">
+    <div class="detail-toolbar"><span class="detail-toolbar-label"><svg class="icon" aria-hidden="true"><use href="#i-note"/></svg>事项详情</span><button class="button" data-static><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg>编辑</button><button class="button ghost icon-button" data-static aria-label="事项更多操作"><svg class="icon" aria-hidden="true"><use href="#i-more"/></svg></button><button class="button ghost icon-button" id="close-detail" aria-label="关闭详情"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+    <div class="detail-content">
+      <h2 class="detail-title">给照片做一个本地整理工具</h2>
+      <div class="item-context"><span class="type-label"><svg class="icon" aria-hidden="true"><use href="#i-code"/></svg>软件</span><span class="status-label"><svg class="icon" aria-hidden="true"><use href="#i-active"/></svg>正在推进</span><span class="review-status"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>需复查</span></div>
+      <section class="stage-section" aria-labelledby="path-heading"><h3 class="section-title" id="path-heading">阶段路径<span class="position">位置 2 / 4</span></h3><div class="path-scroll" tabindex="0" aria-label="软件的阶段路径，当前为验证"><ol class="stage-path">
+        <li class="path-node"><span class="path-point" aria-hidden="true"></span><span class="path-label">想法</span><span class="path-caption"></span></li>
+        <li class="path-node current" aria-current="step"><span class="path-point" aria-hidden="true"></span><span class="path-label">验证</span><span class="path-caption">当前</span></li>
+        <li class="path-node"><span class="path-point" aria-hidden="true"></span><span class="path-label">开发</span><span class="path-caption"></span></li>
+        <li class="path-node"><span class="path-point" aria-hidden="true"></span><span class="path-label">已发布</span><span class="path-caption">完成阶段</span></li>
+      </ol></div></section>
+      <section class="read-section" aria-labelledby="next-heading"><h3 class="section-title" id="next-heading">下一步</h3><div class="next-step"><svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg><p>画出导入后第一次整理的界面</p></div></section>
+      <section class="read-section description" aria-labelledby="description-heading"><h3 class="section-title" id="description-heading">简短说明</h3><p>先验证整理照片的流程，而不是从完整图库开始。</p><p>只做自己愿意每天打开的那一小部分。</p></section>
+      <section class="read-section" aria-labelledby="notes-heading"><h3 class="section-title" id="notes-heading">关联笔记<span class="position">1</span></h3><button class="note-link" data-static><svg class="icon" aria-hidden="true"><use href="#i-note"/></svg><span class="note-text"><span class="note-name">照片整理工具 · 界面草图</span><span class="note-role">资料</span></span><svg class="icon open-icon" aria-hidden="true"><use href="#i-open"/></svg></button></section>
+    </div>
+    <div class="detail-bottom"><button class="button ghost" data-static><svg class="icon" aria-hidden="true"><use href="#i-pause"/></svg>暂停推进</button><button class="button ghost" data-static><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>标记已复查</button><button class="button ghost icon-button" data-static aria-label="归档事项"><svg class="icon" aria-hidden="true"><use href="#i-archive"/></svg></button></div>
+  </aside>
+</div>
+<footer class="preview-bar"><span class="preview-caption"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg><span>静态视觉草图 · 示例数据 · 不保存更改</span></span><div class="theme-controls" aria-label="草图主题"><button class="button ghost icon-button" data-theme-choice="light" aria-label="浅色主题" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg></button><button class="button ghost icon-button" data-theme-choice="dark" aria-label="深色主题" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg></button></div></footer>
+</div>
+<div class="toast" id="preview-message" role="status" hidden>这是静态视觉草图；此操作不会读取笔记、保存或修改事项。</div>
+<script>
+(() => {
+  const root = document.documentElement;
+  const detail = document.querySelector('#detail');
+  const selected = document.querySelector('#selected-card');
+  const scrim = document.querySelector('#scrim');
+  const app = document.querySelector('.app');
+  const previewBar = document.querySelector('.preview-bar');
+  const background = ['#app-header','#capture-area','#board-area'].map(s => document.querySelector(s));
+  const narrow = matchMedia('(max-width:1199px)');
+  let noticeTimer;
+  const fit = () => {
+    const modal = narrow.matches && !detail.hidden;
+    // Keep the reachable theme preview inside the modal, never behind its trap.
+    const footerParent = modal ? detail : app;
+    if (previewBar.parentElement !== footerParent) footerParent.append(previewBar);
+    background.forEach(node => node.inert = modal);
+    detail.setAttribute('role', modal ? 'dialog' : 'complementary');
+    if (modal) detail.setAttribute('aria-modal','true'); else detail.removeAttribute('aria-modal');
+    scrim.hidden = detail.hidden || !narrow.matches;
+  };
+  const theme = value => {
+    root.dataset.theme = value;
+    document.querySelectorAll('[data-theme-choice]').forEach(button => button.setAttribute('aria-pressed',String(button.dataset.themeChoice === value)));
+  };
+  document.querySelectorAll('[data-theme-choice]').forEach(button => button.addEventListener('click',() => theme(button.dataset.themeChoice)));
+  document.querySelectorAll('[data-static]').forEach(button => button.addEventListener('click',() => {
+    const notice = document.querySelector('#preview-message');
+    notice.hidden = false;
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => notice.hidden = true,4500);
+  }));
+  function close() {
+    detail.hidden = true;
+    selected.setAttribute('aria-expanded','false');
+    fit(); selected.focus();
+  }
+  document.querySelector('#close-detail').addEventListener('click',close);
+  selected.addEventListener('click',() => {
+    const wasHidden = detail.hidden;
+    detail.hidden = false; selected.setAttribute('aria-expanded','true'); fit();
+    if (wasHidden && !matchMedia('(prefers-reduced-motion:reduce)').matches) {
+      const tokens = getComputedStyle(root);
+      detail.animate([{transform:`translateX(${tokens.getPropertyValue('--s-3').trim()})`,opacity:.7},{transform:'translateX(0)',opacity:1}],{duration:parseFloat(tokens.getPropertyValue('--duration-panel')),easing:tokens.getPropertyValue('--ease-out').trim()});
+    }
+    detail.focus({preventScroll:true});
+  });
+  document.addEventListener('keydown',event => {
+    if (event.key === 'Escape' && !detail.hidden) { event.preventDefault(); close(); return; }
+    if (event.key !== 'Tab' || !narrow.matches || detail.hidden) return;
+    const controls = [...detail.querySelectorAll('button,[tabindex="0"]')];
+    const first = controls[0], last = controls[controls.length - 1];
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === detail)) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && (document.activeElement === last || !detail.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
+  });
+  narrow.addEventListener('change',() => { fit(); if (narrow.matches && !detail.hidden) detail.focus({preventScroll:true}); });
+  theme(matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light');
+  fit();
+  if (narrow.matches) detail.focus({preventScroll:true});
+})();
+</script>
+</body>
+</html>

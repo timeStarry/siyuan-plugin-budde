@@ -4,4 +4,12 @@ artifacts/
 test-results/
 playwright-report/
 *.log
+
+# Local agent worktrees and execution records
+.agents/
+.superpowers/
+
+# Local environment secrets
 .env
+.env.*
+!.env.example

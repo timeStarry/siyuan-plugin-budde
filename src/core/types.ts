@@ -112,5 +112,5 @@ export interface BuddeClient {
 }
 export interface NoteBridge {
   resolve(target: string): Promise<{ target: string; title: string }>;
-  open(target: string): Promise<void>;
+  open(target: string, signal?: AbortSignal): Promise<void>;
 }

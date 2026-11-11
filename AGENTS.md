@@ -1,5 +1,6 @@
 # Budde
 
+- Before any UI work, read and follow [ui-design-system.md](ui-design-system.md). It is the current persistent UI architecture, visual, interaction and verification contract, superseding earlier visual prototypes where they conflict.
 - This is a SiYuan plugin, not a standalone product. Keep runtime code offline and local.
 - Product source of truth: SiYuan document `20261111001236-5io3spm` (Budde｜需求文档).
 - Use `pnpm check` after substantive changes; UI changes also require browser inspection.

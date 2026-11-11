@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import { readFile, writeFile, mkdir, mkdtemp } from 'node:fs/promises';
+import { inflateRawSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import os from 'node:os';
+const manifest=JSON.parse(await readFile('dist/plugin.json','utf8'));
+const zipPath=`artifacts/release/${manifest.name}-${manifest.version}.zip`;
+const zip=await readFile(zipPath);const expected=['index.js','index.css','plugin.json','README.md','i18n/zh_CN.json','i18n/en_US.json'];
+const names=[];let cursor=0;
+while(zip.readUInt32LE(cursor)===0x04034b50){
+  assert.equal(zip.readUInt16LE(cursor+8),8);const packed=zip.readUInt32LE(cursor+18);const size=zip.readUInt32LE(cursor+22);const len=zip.readUInt16LE(cursor+26);const extra=zip.readUInt16LE(cursor+28);const name=zip.subarray(cursor+30,cursor+30+len).toString();names.push(name);
+  assert.ok(expected.includes(name));const start=cursor+30+len+extra;const bytes=inflateRawSync(zip.subarray(start,start+packed));assert.equal(bytes.length,size);assert.deepEqual(bytes,await readFile(`dist/${name}`));cursor=start+packed;
+}
+assert.equal(zip.readUInt32LE(cursor),0x02014b50);assert.deepEqual(names,expected);assert.equal(zip.readUInt32LE(zip.length-22),0x06054b50);
+const expectedHash=createHash('sha256').update(zip).digest('hex');assert.ok((await readFile(`${zipPath}.sha256`,'utf8')).startsWith(expectedHash));
+const run=(script,...args)=>{const child=spawnSync(process.execPath,[script,...args],{stdio:'inherit'});if(child.error)throw child.error;assert.equal(child.status,0,`${script} failed`);};
+run('scripts/package.mjs');assert.deepEqual(await readFile(zipPath),zip,'Release ZIP must be reproducible');
+const workspace=await mkdtemp(path.join(os.tmpdir(),'budde-synthetic-install-'));
+await mkdir(path.join(workspace,'data','plugins'),{recursive:true});
+const state=path.join(workspace,'data','storage','petal','siyuan-plugin-budde','state.json');await mkdir(path.dirname(state),{recursive:true});
+const stateBytes=Buffer.from('{"synthetic":"unchanged-state-and-versions"}\r\n');await writeFile(state,stateBytes);
+const config=path.join(workspace,'data','plugins','conf.json');const configBytes=Buffer.from('{"siyuan-plugin-budde":false,"other-plugin":true}\n');await writeFile(config,configBytes);
+run('scripts/install.mjs',workspace);run('scripts/install.mjs',workspace);
+assert.deepEqual(await readFile(state),stateBytes);assert.deepEqual(await readFile(config),configBytes);
+for(const file of expected)assert.deepEqual(await readFile(path.join(workspace,'data','plugins',manifest.name,file)),await readFile(`dist/${file}`));
+const js=await readFile('dist/index.js','utf8');const css=await readFile('dist/index.css','utf8');
+assert.match(js,/require\("siyuan"\)/);assert.doesNotMatch(js,/buddeTest|lastOpenedNote|模拟提交|design\/workbench|demo001/);assert.doesNotMatch(js,/showModal\(/);assert.match(css,/\.budde/);
+const embeddedFont=css.match(/data:font\/ttf;base64,([A-Za-z0-9+/=]+)/)?.[1];
+assert.ok(embeddedFont,'Release CSS must include the offline brand font');
+const embeddedFontSha256=createHash('sha256').update(Buffer.from(embeddedFont,'base64')).digest('hex');
+assert.equal(embeddedFontSha256,'39c9b64223561f56aaff6062a6f04063c4fc86809ad6768722c06614d977e1cc','Release font must preserve the official unmodified bytes');
+const license=(await readFile('src/ui/assets/Quicksand-OFL.txt','utf8')).trim();
+assert.ok((await readFile('dist/README.md','utf8')).includes(license),'Release README must include the full font copyright/license');
+console.log(JSON.stringify({zipPath,bytes:zip.length,sha256:expectedHash,entries:names,embeddedFontSha256,fontLicenseIncluded:true,syntheticWorkspace:workspace,upgradePreservedStorageAndEnableConfig:true},null,2));

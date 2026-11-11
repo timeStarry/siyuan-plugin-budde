@@ -1,4 +1,5 @@
 import { Plugin, openTab, showMessage } from "siyuan";
+import { BUDDE_ICON_SYMBOL } from "./brand";
 import {
   BuddeService,
   createInitialState,
@@ -20,9 +21,7 @@ export default class BuddePlugin extends Plugin {
   private startupError?: string;
 
   onload(): void {
-    this.addIcons(
-      '<symbol id="iconBudde" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M12 21V11M12 15C5 15 3 11 3 6c6 0 9 3 9 9Zm0-4c0-5 3-8 9-8 0 5-3 8-9 8Z"/></symbol>',
-    );
+    this.addIcons(BUDDE_ICON_SYMBOL);
     try {
       const host = window as unknown as {
         siyuan?: { config?: { system?: { dataDir?: string } } };

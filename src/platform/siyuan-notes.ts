@@ -47,10 +47,13 @@ export class SiYuanNotes implements NoteBridge {
     };
   }
 
-  async open(target: string): Promise<void> {
+  async open(target: string, signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) return;
     const id = parseNoteId(target);
     // Recheck existence to give a useful error for deleted or unavailable notes.
     await this.resolve(id);
+    // A tab closed during lookup must not reopen/focus the host after teardown.
+    if (signal?.aborted) return;
     await this.openBlock(id);
   }
 }

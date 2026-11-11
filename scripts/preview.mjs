@@ -1,4 +1,5 @@
 import { build } from "esbuild";
+import { buddeCssPlugin } from "./css.mjs";
 import { createServer } from "node:http";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -14,12 +15,15 @@ export async function startPreview() {
       contents: `
     import { BuddeService, MemoryStore } from './src/core/service';
     import { mountWorkbench } from './src/ui';
+    import { createElement } from 'react';
+    import { renderView } from './src/ui/react-renderer';
     import './src/ui/styles.css';
     const client = new BuddeService(new MemoryStore());
-    window.buddeTest = { client, view: mountWorkbench(document.querySelector('#workbench'), client, {
+    const notes = {
       resolve: async target => { const id = target.match(/\\d{14}-[a-z0-9]{7}/)?.[0]; if(!id)throw Error('请输入有效思源链接'); return {target:'siyuan://blocks/'+id,title:'研究资料'}; },
       open: async target => { window.lastOpenedNote = target; }
-    }) };
+    };
+    window.buddeTest = { client, notes, mount: mountWorkbench, view: mountWorkbench(document.querySelector('#workbench'), client, notes), replaceCollection: () => renderView(document.querySelector('[data-part="collection"]'), createElement('p', null, 'Synthetic replacement view')) };
   `,
       resolveDir: root,
       loader: "ts",
@@ -28,6 +32,8 @@ export async function startPreview() {
     outfile: path.join(outdir, "preview.js"),
     format: "iife",
     target: "chrome120",
+    plugins: [buddeCssPlugin()],
+    define: { "process.env.NODE_ENV": '"production"' },
   });
   await writeFile(
     path.join(outdir, "index.html"),

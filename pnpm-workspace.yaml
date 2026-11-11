@@ -1,0 +1,5 @@
+# Only these exact installation-script versions were explicitly approved by the user.
+# Do not widen this allowlist or enable all dependency scripts.
+allowBuilds:
+  esbuild@0.25.12: true
+  esbuild@0.28.2: true
