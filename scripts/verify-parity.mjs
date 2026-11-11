@@ -51,9 +51,11 @@ try {
       await expect(page.locator(`[data-view="${view}"] svg[data-icon="${icon}"]`)).toHaveCount(1);
   });
   await check('type index, search and stage heading icons are rendered', async () => {
-    await expect(page.locator('[data-board-type="software"] svg[data-icon="code"]')).toHaveCount(1);
+    await expect(page.locator('[data-board-type="software"] [data-type-icon]')).toHaveAttribute('data-color', 'default');
+    await expect(page.locator('[data-board-type="software"] [data-type-icon] svg')).toHaveClass(/lucide-shapes/);
     await expect(page.locator('.search-field svg[data-icon="search"]')).toHaveCount(1);
-    await expect(page.locator('.stage-heading svg')).toHaveCount(4);
+    await expect(page.locator('.stage-heading > span:first-child svg')).toHaveCount(4);
+    await expect(page.locator('.stage-heading [data-menu-trigger] svg')).toHaveCount(4);
   });
   await check('reading toolbar and footer use edit, pause, check and archive SVGs', async () => {
     await expect(page.locator('.detail-heading [data-detail-action="edit"] svg[data-icon="edit"]')).toHaveCount(1);
@@ -66,7 +68,7 @@ try {
     for (const icon of icons) {
       expect(icon.lucide, icon.name).toBe(icon.name !== 'brand');
       expect(icon.width).toBe(icon.name === 'brand' ? 24 : 16);
-      expect(icon.height).toBe(icon.width); expect(icon.stroke).toBe('1.75px'); expect(icon.hidden).toBe('true');
+      expect(icon.height).toBe(icon.width); expect(icon.stroke).toBe(icon.name === 'brand' ? '1.75px' : '1.5px'); expect(icon.hidden).toBe('true');
     }
   });
   await page.waitForFunction(() => !document.querySelector('[data-motion-busy="true"]'));
@@ -100,7 +102,7 @@ try {
     const { client, view } = window.buddeTest;
     let state = await client.snapshot();
     for (const [index, stage] of state.types.find(t => t.id === 'software').stages.entries()) {
-      state = (await client.execute({ kind: 'stage.update', typeId: 'software', id: stage.id, expectedRevision: state.revision, name: `自定义阶段 ${index + 1}：较长的阶段名称仍然可以横向阅读`, completed: stage.completed })).state;
+      state = (await client.execute({ kind: 'stage.update', typeId: 'software', id: stage.id, expectedRevision: state.revision, name: `自定义阶段 ${index + 1}：较长的阶段名称完整换行、不横向滚动`, completed: stage.completed })).state;
     }
     await view.refresh();
   });
@@ -110,10 +112,12 @@ try {
       await expect(page.locator('.detail-pane')).toHaveAttribute('role', 'dialog');
       const metrics = await page.evaluate(() => ({ outer: document.documentElement.scrollWidth - innerWidth, detail: document.querySelector('.detail-pane').getBoundingClientRect().width }));
       expect(metrics.outer).toBeLessThanOrEqual(1); expect(metrics.detail).toBe(Math.min(width,420));
-      expect(await page.locator('.stage-path ol').evaluate(n => n.scrollWidth - n.clientWidth)).toBeGreaterThan(0);
-      await expect(page.locator('.stage-path ol')).toHaveAttribute('tabindex', '0');
-      const labels = await page.locator('.path-label').evaluateAll(nodes => nodes.map(n => { const r = n.getBoundingClientRect(); return { left: r.left, right: r.right }; }));
-      expect(labels.slice(1).every((label, i) => label.left >= labels[i].right + 8), 'long path labels must not overlap').toBe(true);
+      expect(await page.locator('.stage-path ol').evaluate(n => n.scrollWidth - n.clientWidth)).toBeLessThanOrEqual(1);
+      await expect(page.locator('.stage-path ol')).toHaveAttribute('aria-label', '可点击的垂直阶段时间轴');
+      const labels = await page.locator('.path-label').evaluateAll(nodes => nodes.map(n => { const r = n.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, overflow: getComputedStyle(n).textOverflow, whiteSpace: getComputedStyle(n).whiteSpace }; }));
+      expect(labels.every(label => label.overflow !== 'ellipsis' && label.whiteSpace !== 'nowrap')).toBe(true);
+      expect(labels.slice(1).every((label, i) => label.top >= labels[i].bottom + 8), 'wrapped vertical path labels must not overlap').toBe(true);
+      const stageButtons = page.locator('.stage-path button'); await stageButtons.first().focus(); await page.keyboard.press('Tab'); await expect(stageButtons.nth(1)).toBeFocused();
       await expect(page.locator('[data-detail-action="edit"]')).toBeVisible();
     });
     await page.screenshot({ animations: 'disabled', path: `${output}/production-dark-${width}-detail.png` });

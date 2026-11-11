@@ -3,7 +3,7 @@ import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { startPreview } from "./preview.mjs";
 const preview = await startPreview();
 const browser = await chromium.launch({ channel: "msedge", headless: true });
-const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
+const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true, reducedMotion: 'reduce' });
 const errors = []; const passed = [];
 page.on("pageerror", error => errors.push(error.message));
 await mkdir("artifacts/qa", { recursive: true });
@@ -127,7 +127,9 @@ try {
   await expect.poll(async () => (await snapshot()).items.find(i => i.id === currentItem.id).stageId).toBe(software.initialStageId);
   passed.push('explicit cross-type migration, keyboard and drag board movement');
   // Config CRUD, optimistic conflict retention, initial stage, completed independent of order.
-  await menu('settings'); await expect(part('settings-dialog')).toBeVisible();
+  const softwareSettings = page.locator('[data-type-row="software"] [data-action="type.settings"]');
+  await page.locator('[data-type-row="software"]').hover(); await expect(softwareSettings).toHaveCSS('opacity', '1');
+  await softwareSettings.click(); await expect(part('settings-dialog')).toBeVisible();
   await settingsAction('type.create').click(); await part('setting-name').fill('新类型'); await part('settings-form').getByRole('button',{name:'保存设置',exact:true}).click();
   await expect(page.locator('[data-settings-type]').filter({hasText:'新类型'})).toBeVisible();
   await settingsAction('type.update').click(); await part('setting-name').fill('改名类型');
@@ -176,10 +178,11 @@ try {
     await page.evaluate(({theme,width}) => { const root=document.querySelector('.budde'); root.dataset.theme=theme; root.style.width=width+'px'; },{theme,width});
     await open('旅行照片整理工具');
     await expect(page.locator('.detail-pane')).toHaveAttribute('role',width<1200?'dialog':'region');
-    const metrics=await page.evaluate(() => { const root=document.querySelector('.budde'); const visible=node=>node.getClientRects().length&&!node.closest('[inert]'); return { overflow:root.scrollWidth-root.clientWidth, controls:[...root.querySelectorAll('button:not(.card-open):not(.note-link),summary,input:not([type=checkbox]),select')].filter(visible).map(node=>({height:node.getBoundingClientRect().height,label:node.textContent||node.getAttribute('aria-label')})), icons:[...root.querySelectorAll('svg')].filter(visible).map(node=>({size:node.getBoundingClientRect().width,stroke:getComputedStyle(node).strokeWidth})), path:root.querySelector('.stage-path').scrollWidth-root.querySelector('.stage-path').clientWidth }; });
+    const metrics=await page.evaluate(() => { const root=document.querySelector('.budde'); const visible=node=>node.getClientRects().length&&!node.closest('[inert]'); return { overflow:root.scrollWidth-root.clientWidth, controls:[...root.querySelectorAll('button:not(.card-open):not(.note-link):not([data-detail-stage-target]),summary,input:not([type=checkbox]),select')].filter(visible).map(node=>({height:node.getBoundingClientRect().height,label:node.textContent||node.getAttribute('aria-label')})), icons:[...root.querySelectorAll('svg')].filter(visible).map(node=>({name:node.dataset.icon,size:node.getBoundingClientRect().width,stroke:getComputedStyle(node).strokeWidth})), stageControls:[...root.querySelectorAll('[data-detail-stage-target]')].filter(visible).map(node=>node.getBoundingClientRect().height), path:root.querySelector('.stage-path').scrollWidth-root.querySelector('.stage-path').clientWidth }; });
     expect(metrics.overflow,JSON.stringify({theme,width,metrics})).toBeLessThanOrEqual(1);
     expect(metrics.controls.filter(entry=>Math.abs(entry.height-36)>0.1),JSON.stringify({theme,width,metrics})).toEqual([]);
-    expect(metrics.icons.every(entry=>[16,24].includes(entry.size)&&entry.stroke==='1.75px')).toBe(true);
+    expect(metrics.stageControls.every(height=>height>=36)).toBe(true); expect(metrics.path).toBeLessThanOrEqual(1);
+    expect(metrics.icons.every(entry=>[16,24].includes(entry.size)&&entry.stroke===(entry.name==='brand'?'1.75px':'1.5px')),JSON.stringify({theme,width,icons:metrics.icons})).toBe(true);
     await page.screenshot({path:`artifacts/qa/production-${theme}-${width}.png`}); await close();
   }
   await page.evaluate(()=>{document.querySelector('.budde').style.width='100%';delete document.querySelector('.budde').dataset.theme;});

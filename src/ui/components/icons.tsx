@@ -5,5 +5,5 @@ const icons: Record<Exclude<IconName, "brand">, LucideIcon> = { pool: Inbox, boa
 export function Icon({ name }: { name: IconName }) {
   if (name === "brand") return <svg data-icon={name} width={24} height={24} viewBox={BUDDE_MARK.viewBox} fill="none" stroke="currentColor" strokeWidth={BUDDE_MARK.strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" className="bd-shrink-0"><path d={BUDDE_MARK.path} /></svg>;
   const Component = icons[name];
-  return <Component data-icon={name} size={16} strokeWidth={1.75} aria-hidden="true" focusable="false" className="bd-shrink-0" />;
+  return <Component data-icon={name} size={16} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" className="bd-shrink-0" />;
 }

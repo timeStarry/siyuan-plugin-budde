@@ -5,6 +5,9 @@
   --bd-border:228 228 231; --bd-input:228 228 231;
   --bd-primary:24 24 27; --bd-primary-foreground:255 255 255; --bd-primary-hover:39 39 42;
   --bd-accent:228 228 231; --bd-ring:113 113 122; --bd-scrim:24 24 27;
+  --bd-type-blue:52 92 152; --bd-type-emerald:34 112 86; --bd-type-amber:145 93 21;
+  --bd-type-violet:111 78 158; --bd-type-rose:158 68 93;
+  --bd-surface-inset:inset 0 1px 0 rgb(255 255 255 / 0.7);
   color-scheme:light;
 }
 :root[data-theme-mode="dark"] .budde, .budde[data-theme="dark"] {
@@ -13,5 +16,8 @@
   --bd-border:63 63 70; --bd-input:63 63 70;
   --bd-primary:244 244 245; --bd-primary-foreground:24 24 27; --bd-primary-hover:228 228 231;
   --bd-accent:63 63 70; --bd-ring:161 161 170; --bd-scrim:0 0 0;
+  --bd-type-blue:147 183 229; --bd-type-emerald:121 191 165; --bd-type-amber:214 176 112;
+  --bd-type-violet:184 159 220; --bd-type-rose:224 157 177;
+  --bd-surface-inset:inset 0 1px 0 rgba(255,255,255,0.06);
   color-scheme:dark;
 }

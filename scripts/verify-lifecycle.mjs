@@ -71,7 +71,7 @@ try {
   expect(await second.evaluate(n=>n.inert)).toBe(false);
   expect(await page.evaluate(()=>[...document.querySelectorAll('[id]')].map(n=>n.id).filter((id,i,ids)=>ids.indexOf(id)!==i))).toEqual([]);
   await first.locator('[data-choice="cancel"]').click(); await first.locator('[data-detail-action="close"]').click(); await first.locator('[data-choice="discard"]').click();
-  await first.locator('.header-secondary [data-menu-trigger]').click(); await first.getByRole('menu').locator('[data-action="settings"]').click();
+  await first.locator('[data-view="board"]').click(); await first.locator('[data-action="type.settings"]').first().click();
   await expect(first.locator('[data-part="settings-dialog"]')).toBeVisible();
   await expect(second.locator('[data-part="capture-title"]')).toBeEnabled();
   const hostAfter=await page.locator('#host-sentinel button').evaluate(n=>{const c=getComputedStyle(n);return {height:c.height,color:c.color,bg:c.backgroundColor,font:c.font};});
@@ -79,7 +79,7 @@ try {
   await first.locator('[data-settings-action="close"]').click(); await page.evaluate(()=>{window.secondView.destroy();document.querySelector('#second').remove();document.querySelector('#workbench').style.width='100%';});
   passed.push('two instances: unique IDs, container overlay, nested modal and untouched host theme/styles/inert');
   // Two rapid settings invocations share one open; no second render or inert owner.
-  await page.evaluate(()=>{window.openSnapshots=0;window.buddeTest.client.snapshot=async()=>{window.openSnapshots++;await new Promise(resolve=>window.releaseSnapshot=resolve);return window.realSnapshot();};const button=document.querySelector('[data-action="settings"]');button.click();button.click();});
+  await page.evaluate(()=>{window.openSnapshots=0;window.buddeTest.client.snapshot=async()=>{window.openSnapshots++;await new Promise(resolve=>window.releaseSnapshot=resolve);return window.realSnapshot();};const button=document.querySelector('[data-action="type.settings"]');button.click();button.click();});
   await expect.poll(()=>page.evaluate(()=>window.openSnapshots)).toBe(1);
   await page.evaluate(()=>window.releaseSnapshot());await expect(part('settings-dialog')).toBeVisible();
   await page.locator('[data-settings-action="type.create"]').click();await part('setting-name').fill('没有被第二次打开抹掉');await expect(part('setting-name')).toHaveValue('没有被第二次打开抹掉');
@@ -89,7 +89,7 @@ try {
   passed.push('double settings open is single-flight and restores its only inert ownership');
   // Destroy during a settings.open snapshot must not show a detached dialog or inert host.
   await page.evaluate(()=>window.buddeTest.client.snapshot=async()=>{await new Promise(resolve=>window.releaseSnapshot=resolve);return window.realSnapshot();});
-  await page.locator('.header-secondary [data-menu-trigger]').click(); await page.getByRole('menu').locator('[data-action="settings"]').click();
+  await page.locator('[data-action="type.settings"]').first().click();
   await expect.poll(()=>page.evaluate(()=>typeof window.releaseSnapshot)).toBe('function');
   await page.evaluate(()=>window.buddeTest.view.destroy()); await page.evaluate(()=>window.releaseSnapshot());
   await expect(page.locator('#workbench')).toBeEmpty();

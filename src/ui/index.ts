@@ -1,8 +1,8 @@
-import type { BuddeClient, BuddeState, ItemPatch, NoteBridge } from "../core/types";
+import type { BuddeClient, BuddeState, Command, ItemPatch, NoteBridge } from "../core/types";
 import { CaptureRequest, selectItems, type Filters, type View } from "./model";
 import { createElement as h } from "react";
 import { CollectionView } from "./collection-view";
-import { WorkbenchView, TypeIndexView, TypeOptions } from "./workbench-view";
+import { WorkbenchView, MainNavView, TypeIndexView, TypeOptions } from "./workbench-view";
 import { renderView, destroyViews } from "./react-renderer";
 import { query } from "./dom";
 import { mountDetail } from "./detail";
@@ -11,7 +11,7 @@ import { mountSettings } from "./settings";
 
 export function mountWorkbench(root: HTMLElement, client: BuddeClient, notes: NoteBridge): { refresh(): Promise<void>; destroy(): void } {
   let state: BuddeState | undefined; let view: View = "pool"; let boardType = ""; let captureType = ""; let selected = "";
-  let destroyed = false; let capturing = false; let composing = false; let refreshing = false;
+  let destroyed = false; let capturing = false; let composing = false; let refreshing = false; let configuring = false;
   const filters: Filters = { query: "", typeId: "", unpromotedOnly: false };
   const request = new CaptureRequest(); const events = new AbortController(); const mutating = new Set<string>();
   root.classList.add("budde", "workbench"); root.dataset.instance = `budde-${crypto.randomUUID()}`;
@@ -21,7 +21,13 @@ export function mountWorkbench(root: HTMLElement, client: BuddeClient, notes: No
   const search = $<HTMLInputElement>("#title-search"); const filterType = $<HTMLSelectElement>("#filter-type"); const collection = $("#collection");
   function notify(message: string, error = false) { if (destroyed) return; $("#error").hidden = !error; $("#error").textContent = error ? message : ""; $("#notice").textContent = error ? "" : message; }
   function adopt(next: BuddeState) { if (destroyed || (state && next.revision < state.revision)) return; state = next; render(); }
-  const detail = mountDetail($("#detail-host"), { client, notes, onSaved: adopt, onClosed() { selected = ""; render(); } });
+  let hudTimer: ReturnType<typeof setTimeout> | undefined;
+  function success(message: string) {
+    if (destroyed) return;
+    clearTimeout(hudTimer); $("#success-message").textContent = message; $("#success-hud").hidden = false;
+    hudTimer = setTimeout(() => { if (!destroyed) { $("#success-hud").hidden = true; $("#success-message").textContent = ""; } }, 2200);
+  }
+  const detail = mountDetail($("#detail-host"), { client, notes, onSaved: adopt, onSuccess: success, onClosed() { selected = ""; render(); } });
   let settingsOpener: HTMLElement | null = null;
   const settings = mountSettings($<HTMLDialogElement>("#settings-dialog"), { client, onSaved: adopt, onClosed() { if (!destroyed && settingsOpener?.isConnected && root.contains(settingsOpener)) settingsOpener.focus(); }, async confirmDiscard() { return await choose(root, "放弃设置草稿并读取最新配置？", "未保存的设置输入会被丢弃，不覆盖已经提交的配置。", [{ value: "reload", label: "放弃并读取" }, { value: "cancel", label: "继续编辑" }]) === "reload"; } });
   function render() {
@@ -33,6 +39,7 @@ export function mountWorkbench(root: HTMLElement, client: BuddeClient, notes: No
     renderView(createType, h(TypeOptions, { state: latest })); createType.value = captureType;
     renderView(filterType, h(TypeOptions, { state: latest, all: true })); filterType.value = filters.typeId; filterType.hidden = view === "board";
     search.value = filters.query;
+    renderView($("#main-nav"), h(MainNavView, { view }));
     root.querySelectorAll<HTMLButtonElement>("header [data-view]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.view === view)));
     $("#pool-modes").hidden = view !== "pool";
     root.querySelectorAll<HTMLButtonElement>("[data-pool]").forEach(button => button.setAttribute("aria-pressed", String((button.dataset.pool === "unpromoted") === filters.unpromotedOnly)));
@@ -48,7 +55,7 @@ export function mountWorkbench(root: HTMLElement, client: BuddeClient, notes: No
       const item = state?.items.find(entry => entry.id === id);
       if (!item || item.typeId !== boardType || item.archived || !item.promoted) return;
       return run(() => mutate(id, { stageId }));
-    } }));
+    }, async onAddStage(name) { await configure({ kind: 'stage.add', typeId: type.id, name, expectedRevision: latest.revision }); } }));
     collection.scrollTop = position.top; collection.scrollLeft = position.left;
     detail.refresh(latest);
     const hidden = $("#selected-hidden"); if (hidden) hidden.hidden = selectItems(latest, view, current).some(item => item.id === selected);
@@ -59,6 +66,13 @@ export function mountWorkbench(root: HTMLElement, client: BuddeClient, notes: No
     try { const next = await client.snapshot(); if (!destroyed && (!state || next.revision > state.revision)) { const initial = !state; adopt(next); if (initial) notify(""); } }
     catch (cause) { notify(cause instanceof Error ? cause.message : String(cause), true); }
     finally { refreshing = false; }
+  }
+  async function configure(command: Extract<Command, { kind: 'stage.add' | 'stage.update' | 'stage.reorder' }>) {
+    if (destroyed) return;
+    if (configuring) throw new Error('配置正在保存，请稍候。');
+    configuring = true;
+    try { const result = await client.execute(command); if (!destroyed) { adopt(result.state); notify('阶段配置已保存。'); } }
+    finally { configuring = false; }
   }
   function run(task: () => Promise<void>) { if (destroyed) return; return task().catch(cause => notify(cause instanceof Error ? cause.message : String(cause), true)); }
   async function mutate(id: string, patch: ItemPatch) {
@@ -76,7 +90,15 @@ export function mountWorkbench(root: HTMLElement, client: BuddeClient, notes: No
     run(async () => { try { const result = await client.execute(request.prepare(captureInput.value, captureType)); if (destroyed) return; request.success(); captureInput.value = ""; adopt(result.state); notify("已记入想法池，尚未开始推进。继续记录下一条吧。"); } finally { capturing = false; if (!destroyed) { form.setAttribute("aria-busy", "false"); form.querySelectorAll<HTMLInputElement | HTMLButtonElement>("input,select,button").forEach(control => control.disabled = false); captureInput.focus(); } } });
   }) as EventListener);
   listen("compositionstart", (() => composing = true) as EventListener); listen("compositionend", (() => composing = false) as EventListener);
-  listen("keydown", ((event: KeyboardEvent) => { if (event.target === captureInput && event.key === "Enter" && (composing || event.isComposing || event.keyCode === 229)) event.preventDefault(); }) as EventListener);
+  listen("keydown", ((event: KeyboardEvent) => {
+    const ime = composing || event.isComposing || event.keyCode === 229;
+    if (event.target === captureInput && event.key === "Enter" && ime) event.preventDefault();
+    const target = event.target instanceof Element ? event.target : null;
+    if (event.defaultPrevented || ime || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.key.toLowerCase() !== "c" || !target || target.closest('.budde') !== root) return;
+    if (target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="menu"]') || root.querySelector('dialog[open],[role="dialog"][aria-modal="true"],[role="menu"]') || captureInput.disabled || capturing) return;
+    event.preventDefault();
+    run(async () => { if (await detail.requestClose() && !destroyed && root.contains(root.ownerDocument.activeElement)) captureInput.focus(); });
+  }) as EventListener);
   listen("input", ((event: Event) => { if (event.target === search) { filters.query = search.value; render(); } }) as EventListener);
   listen("change", ((event: Event) => { if (event.target === createType) captureType = createType.value; if (event.target === filterType) { filters.typeId = filterType.value; render(); } }) as EventListener);
   listen("click", ((event: MouseEvent) => {
@@ -88,7 +110,20 @@ export function mountWorkbench(root: HTMLElement, client: BuddeClient, notes: No
     if (button.dataset.open) run(async () => { const item = state!.items.find(entry => entry.id === button.dataset.open); if (item && await detail.open(item, state!) && !destroyed) { selected = item.id; render(); } });
     if (button.dataset.promote) run(() => mutate(button.dataset.promote!, { promoted: true }));
     if (button.dataset.stageItem) run(() => mutate(button.dataset.stageItem!, { stageId: button.dataset.stageTarget }));
-    if (button.dataset.action === "settings") run(async () => { const owner = button.closest<HTMLElement>("[data-menu-owner]")?.dataset.menuOwner; const opener = owner ? root.querySelector<HTMLElement>(`[data-menu-id="${CSS.escape(owner)}"]`) ?? button : button; if (await detail.requestClose() && !destroyed) { settingsOpener = opener; await settings.open(); } });
+    if (button.dataset.action === 'type.create' || button.dataset.action === 'type.settings' || button.dataset.action === 'stage.settings') run(async () => {
+      const owner = button.closest<HTMLElement>('[data-menu-owner]')?.dataset.menuOwner;
+      const opener = owner ? root.querySelector<HTMLElement>(`[data-menu-id="${CSS.escape(owner)}"]`) ?? button : button;
+      const target = button.dataset.action === 'type.create' ? { kind: 'type.create' as const } : button.dataset.action === 'type.settings' ? { kind: 'type.update' as const, typeId: button.dataset.typeId } : { kind: button.dataset.operation === 'delete' ? 'stage.delete' as const : 'stage.update' as const, typeId: button.dataset.typeId, id: button.dataset.stageId };
+      if (await detail.requestClose() && !destroyed) { settingsOpener = opener; await settings.open(target); }
+    });
+    if (button.dataset.stageCommand) run(async () => {
+      const type = state!.types.find(type => type.id === button.dataset.typeId);
+      const stage = type?.stages.find(stage => stage.id === button.dataset.stageId);
+      if (!type || !stage) return;
+      const expectedRevision = state!.revision;
+      if (button.dataset.stageCommand === 'toggle') await configure({ kind: 'stage.update', typeId: type.id, id: stage.id, name: stage.name, completed: !stage.completed, expectedRevision });
+      else { const ids = type.stages.map(stage => stage.id), index = ids.indexOf(stage.id), next = index + (button.dataset.stageCommand === 'left' ? -1 : 1); if (next < 0 || next >= ids.length) return; [ids[index], ids[next]] = [ids[next], ids[index]]; await configure({ kind: 'stage.reorder', typeId: type.id, ids, expectedRevision }); }
+    });
     if (button.dataset.action === "refresh") void refresh();
     if (button.dataset.action === "export") run(async () => { const data = await client.exportData(); if (destroyed) return; const url = URL.createObjectURL(new Blob([data], { type: "application/json" })); const link = document.createElement("a"); link.href = url; link.download = "budde.json"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 0); notify("已导出 JSON，不包含思源笔记正文。"); });
     if (button.dataset.action === "focus-capture") captureInput.focus();
@@ -96,5 +131,5 @@ export function mountWorkbench(root: HTMLElement, client: BuddeClient, notes: No
   // Read delegated commands before Radix can unmount a selected portal item.
   }) as EventListener, true);
   void refresh();
-  return { refresh, destroy() { if (destroyed) return; destroyed = true; root.querySelectorAll<HTMLDialogElement>(".guard-dialog[open]").forEach(dialog => dialog.close()); settings.destroy(); detail.destroy(); events.abort(); destroyViews(root); root.replaceChildren(); root.classList.remove("budde", "workbench"); delete root.dataset.instance; } };
+  return { refresh, destroy() { if (destroyed) return; destroyed = true; clearTimeout(hudTimer); root.querySelectorAll<HTMLDialogElement>(".guard-dialog[open]").forEach(dialog => dialog.close()); settings.destroy(); detail.destroy(); events.abort(); destroyViews(root); root.replaceChildren(); root.classList.remove("budde", "workbench"); delete root.dataset.instance; } };
 }

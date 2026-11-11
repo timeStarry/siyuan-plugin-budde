@@ -12,8 +12,11 @@ export function fitDialog(dialog: HTMLDialogElement): () => void {
   const background = Array.from(root.children).filter((child): child is HTMLElement => child instanceof HTMLElement && child !== layer && !child.contains(dialog));
   const previous = background.map(child => child.inert);
   background.forEach(child => child.inert = true);
-  const events = new AbortController();
+  const events = new AbortController(); let composing = false;
+  layer.addEventListener("compositionstart", () => composing = true, { signal: events.signal });
+  layer.addEventListener("compositionend", () => composing = false, { signal: events.signal });
   layer.addEventListener("keydown", event => {
+    if (composing || event.isComposing || event.keyCode === 229) return;
     const guard = root.querySelector(".guard-dialog[open]");
     if (guard && guard !== dialog) return;
     if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); dialog.dispatchEvent(new Event("cancel", { cancelable: true })); }

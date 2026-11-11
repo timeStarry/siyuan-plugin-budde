@@ -6,5 +6,5 @@
 - Use `pnpm check` after substantive changes; UI changes also require browser inspection.
 - Never store credentials or private workspace data in the repository or fixtures.
 - Preserve collaborators' edits. Keep core logic independent of SiYuan and UI.
-- Scope for alpha.1: desktop plugin, idea capture, per-type lifecycle boards, details, links, archive/pause, JSON export, shared mutation commands with idempotency and optimistic versions.
-- Multi-device concurrent editing and external AI adapters are outside alpha.1 support. Do not claim otherwise.
+- Scope for alpha.2: desktop plugin, idea capture, contextual type/stage configuration with optional icon/color and templates, per-type boards, wrapped vertical stage path, details, links, archive/pause, JSON export, shared idempotent/versioned mutations. Preserve schemaVersion 1 and exact legacy omissions.
+- Multi-device concurrent editing and external AI adapters remain unsupported. Do not claim otherwise.

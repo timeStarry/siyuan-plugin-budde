@@ -1,3 +1,5 @@
+import type { StageTemplateId, TypeColor } from "./type-config";
+
 export interface Stage {
   id: string;
   name: string;
@@ -8,6 +10,8 @@ export interface ItemType {
   name: string;
   initialStageId: string;
   stages: Stage[];
+  icon?: string;
+  color?: TypeColor;
 }
 export interface NoteLink {
   id: string;
@@ -65,13 +69,15 @@ export type Command =
       expectedVersion: number;
       patch: ItemPatch;
     }
-  | { kind: "type.create"; expectedRevision: number; name: string }
+  | { kind: "type.create"; expectedRevision: number; name: string; icon?: string | null; color?: TypeColor | null; template?: StageTemplateId }
   | {
       kind: "type.update";
       expectedRevision: number;
       id: string;
       name: string;
       initialStageId?: string;
+      icon?: string | null;
+      color?: TypeColor | null;
     }
   | { kind: "type.delete"; expectedRevision: number; id: string }
   | {

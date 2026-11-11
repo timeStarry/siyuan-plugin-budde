@@ -74,7 +74,7 @@ try {
   await check('Lucide icons have consistent geometry and accessible decoration', async () => {
     const icons = await page.locator('svg[data-icon]').evaluateAll(nodes => nodes.filter(n => n.getBoundingClientRect().width).map(n => ({ name: n.dataset.icon, lucide: n.classList.contains('lucide'), width: n.getBoundingClientRect().width, stroke: getComputedStyle(n).strokeWidth, hidden: n.getAttribute('aria-hidden') })));
     expect(icons.length).toBeGreaterThan(20);
-    for (const icon of icons) { expect(icon.lucide, icon.name).toBe(icon.name !== 'brand'); expect(icon.width).toBe(icon.name === 'brand' ? 24 : 16); expect(icon.stroke).toBe('1.75px'); expect(icon.hidden).toBe('true'); }
+    for (const icon of icons) { expect(icon.lucide, icon.name).toBe(icon.name !== 'brand'); expect(icon.width).toBe(icon.name === 'brand' ? 24 : 16); expect(icon.stroke).toBe(icon.name === 'brand' ? '1.75px' : '1.5px'); expect(icon.hidden).toBe('true'); }
   });
   await check('real dnd-kit pointer drag shows translucent overlay and commits stage movement', async () => {
     const source = page.locator('.stage-column').first();
