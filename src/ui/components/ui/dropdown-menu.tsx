@@ -10,7 +10,7 @@ export function DropdownMenu({ label, children, className = "" }: { label: strin
     // Never pull focus back from another instance/host after outside dismissal.
     const active = root.ownerDocument.activeElement;
     if (root.querySelector('dialog[open]') || (active && active !== root.ownerDocument.body && !root.contains(active))) event.preventDefault();
-  }} className="bd-z-50 bd-min-w-40 bd-max-w-[min(24rem,var(--radix-dropdown-menu-content-available-width))] bd-max-h-[var(--radix-dropdown-menu-content-available-height)] bd-overflow-y-auto bd-overflow-x-hidden bd-rounded-md bd-border bd-border-border bd-bg-card bd-p-1 bd-text-foreground bd-shadow-xs">{children}</Menu.Content></Menu.Portal></Menu.Root>;
+  }} className="bd-z-50 bd-min-w-40 bd-max-w-[min(24rem,var(--radix-dropdown-menu-content-available-width))] bd-max-h-[var(--radix-dropdown-menu-content-available-height)] bd-overflow-y-auto bd-overflow-x-hidden bd-rounded-md bd-border bd-border-border bd-bg-card/85 bd-backdrop-blur-[12px] bd-p-1 bd-text-foreground bd-shadow-xs">{children}</Menu.Content></Menu.Portal></Menu.Root>;
 }
 export function DropdownMenuItem({ children }: { children: ReactNode }) { return <Menu.Item asChild>{children}</Menu.Item>; }
 export const menuItemClass = "bd-w-full bd-justify-start bd-font-normal focus:bd-bg-muted focus:bd-outline-none";

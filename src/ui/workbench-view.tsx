@@ -1,7 +1,9 @@
 import type { BuddeState } from "../core/types";
-import { typeIcon } from "./dom";
+import { TypeIcon } from "./type-presentation";
 import { selectItems, type Filters } from "./model";
-import { usePart } from "./react-renderer";
+import { usePart, usePane } from "./react-renderer";
+import { motion, useReducedMotion } from "framer-motion";
+import type { View } from "./model";
 import { Icon } from "./components/icons";
 import { Button } from "./components/ui/button";
 import { Input, NativeSelect } from "./components/ui/fields";
@@ -14,12 +16,10 @@ export function WorkbenchView() {
   return <>
     <header className="app-header bd-flex bd-min-h-16 bd-shrink-0 bd-items-center bd-gap-6 bd-border-b bd-border-border bd-bg-card bd-px-6 bd-py-3 [@container(max-width:640px)]:bd-flex-wrap [@container(max-width:640px)]:bd-gap-2 [@container(max-width:640px)]:bd-px-3">
       <div className="brand bd-flex bd-w-36 bd-shrink-0 bd-items-center bd-gap-2 bd-text-lg bd-font-semibold"><Icon name="brand" /><span data-brand-wordmark className="bd-font-brand bd-font-semibold bd-tracking-normal bd-whitespace-nowrap [font-synthesis:none]">Budde</span></div>
-      <nav className="main-nav bd-flex bd-min-w-0 bd-gap-1 [@container(max-width:640px)]:bd-order-3 [@container(max-width:640px)]:bd-w-full [@container(max-width:640px)]:bd-overflow-x-auto" aria-label="主视图">
-        {([['pool', '想法池'], ['board', '看板'], ['active', '正在推进']] as const).map(([view, label]) => <Button key={view} variant="ghost" data-view={view} aria-pressed={false}><Icon name={view} />{label}</Button>)}
-      </nav>
+      <nav {...part('main-nav')} className="main-nav bd-flex bd-min-w-0 bd-gap-1 [@container(max-width:640px)]:bd-order-3 [@container(max-width:640px)]:bd-w-full [@container(max-width:640px)]:bd-overflow-x-auto" aria-label="主视图" />
       <div className="header-secondary bd-ml-auto bd-flex bd-items-center bd-gap-1">
         <Button variant="ghost" data-view="archive" aria-pressed={false}><Icon name="archive" />归档</Button>
-        <DropdownMenu label="更多操作" className="more"><DropdownMenuItem><Button variant="ghost" className={menuItemClass} data-action="settings"><Icon name="settings" />管理类型与阶段</Button></DropdownMenuItem><DropdownMenuItem><Button variant="ghost" className={menuItemClass} data-action="export"><Icon name="note" />导出 JSON</Button></DropdownMenuItem><DropdownMenuItem><Button variant="ghost" className={menuItemClass} data-action="refresh"><Icon name="circle" />重新读取</Button></DropdownMenuItem></DropdownMenu>
+        <DropdownMenu label="更多操作" className="more"><DropdownMenuItem><Button variant="ghost" className={menuItemClass} data-action="export"><Icon name="note" />导出 JSON</Button></DropdownMenuItem><DropdownMenuItem><Button variant="ghost" className={menuItemClass} data-action="refresh"><Icon name="circle" />重新读取</Button></DropdownMenuItem></DropdownMenu>
       </div>
     </header>
     <section className="capture-area bd-shrink-0 bd-border-b bd-border-border bd-bg-card bd-px-6 bd-py-4 [@container(max-width:640px)]:bd-px-3" aria-label="快速记录">
@@ -29,7 +29,7 @@ export function WorkbenchView() {
         <div className="capture-type bd-flex bd-min-w-0 bd-items-center bd-gap-2 [@container(max-width:640px)]:bd-col-start-2 [@container(max-width:640px)]:bd-row-start-2">
           <span className="bd-shrink-0 bd-text-xs bd-text-muted-foreground [@container(max-width:800px)]:bd-hidden">新事项类型</span><NativeSelect {...part('create-type')} aria-label="新事项类型" disabled className="bd-w-32 [@container(max-width:640px)]:bd-w-full" />
         </div>
-        <Button type="submit" disabled className="[@container(max-width:640px)]:bd-col-start-3 [@container(max-width:640px)]:bd-row-span-2 [@container(max-width:640px)]:bd-row-start-1">记下来</Button>
+        <Button type="submit" disabled className="[@container(max-width:640px)]:bd-col-start-3 [@container(max-width:640px)]:bd-row-span-2 [@container(max-width:640px)]:bd-row-start-1">记下来<kbd data-capture-hint aria-hidden="true" className="bd-rounded-sm bd-border bd-border-primary-foreground/25 bd-px-1 bd-text-xs bd-font-normal bd-opacity-80 [@container(max-width:640px)]:bd-sr-only">Enter</kbd></Button>
       </form>
       <div className="capture-feedback bd-mt-2 bd-text-xs bd-leading-4 bd-text-muted-foreground"><div {...part('notice')} role="status" aria-live="polite">正在读取工作空间数据…</div><div {...part('error')} role="alert" hidden /></div>
     </section>
@@ -48,14 +48,21 @@ export function WorkbenchView() {
       </section>
       <div {...part('detail-host')} className="bd-min-h-0 bd-max-w-full bd-shrink-0 data-[overlay=true]:bd-absolute data-[overlay=true]:bd-inset-0 data-[overlay=true]:bd-z-20 data-[overlay=true]:bd-flex data-[overlay=true]:bd-justify-end data-[overlay=true]:bd-bg-scrim/10" />
     </main>
+    <div {...part('success-hud')} hidden role="status" aria-live="polite" aria-atomic="true" className="success-hud bd-pointer-events-none bd-absolute bd-bottom-6 bd-left-1/2 bd-z-40 bd-flex bd-max-w-[calc(100%-24px)] -bd-translate-x-1/2 bd-items-center bd-gap-2 bd-rounded-lg bd-border bd-border-border bd-bg-card/85 bd-px-4 bd-py-3 bd-text-control bd-text-foreground bd-shadow-xs bd-backdrop-blur-[12px]"><Icon name="check" /><span {...part('success-message')} className="bd-min-w-0 bd-break-words" /></div>
     <div className={`dialog-layer settings-layer ${dialogLayer} [&:not(:has(dialog[open]))]:bd-hidden`}><Dialog {...part('settings-dialog')} aria-label="管理类型与阶段" /></div>
   </>;
+}
+export function MainNavView({ view }: { view: View }) {
+  const { prefix } = usePane(); const reduced = useReducedMotion();
+  return <>{([['pool', '想法池'], ['board', '看板'], ['active', '正在推进']] as const).map(([target, label]) => <Button key={target} variant="ghost" data-view={target} aria-pressed={target === view} className="bd-relative bd-isolate aria-pressed:bd-bg-transparent">
+    {target === view && <motion.span data-nav-indicator layoutId={`${prefix}-main-nav`} className="bd-pointer-events-none bd-absolute bd-inset-0 -bd-z-10 bd-rounded-md bd-border bd-border-border bd-bg-muted bd-shadow-xs" transition={{ duration: reduced ? 0 : 0.18, ease: [0.22, 1, 0.36, 1] }} />}
+    <Icon name={target} />{label}
+  </Button>)}</>;
 }
 export function TypeOptions({ state, all = false }: { state: BuddeState; all?: boolean }) { return <>{all && <option value="">所有类型</option>}{state.types.map(type => <option key={type.id} value={type.id}>{type.name}</option>)}</>; }
 export function TypeIndexView({ state, boardType, filters }: { state: BuddeState; boardType: string; filters: Filters }) {
   return <div className="bd-flex bd-flex-col bd-gap-1 [@container(max-width:800px)]:bd-flex-row [@container(max-width:800px)]:bd-overflow-x-auto">
-    <p className="bd-px-3 bd-py-2 bd-text-xs bd-text-muted-foreground [@container(max-width:800px)]:bd-hidden">按类型查看</p>
-    {state.types.map(type => <Button key={type.id} variant="ghost" data-board-type={type.id} aria-pressed={type.id === boardType} className="bd-w-full bd-justify-start [@container(max-width:800px)]:bd-w-40"><Icon name={typeIcon(type.name)} /><span className="type-name bd-min-w-0 bd-flex-1 bd-truncate bd-text-left" title={type.name}>{type.name}</span><Badge className="count bd-shrink-0 bd-border-transparent bd-bg-transparent bd-p-0">{selectItems(state, 'board', { ...filters, typeId: type.id }).length}</Badge></Button>)}
-    <Button variant="ghost" data-action="settings" className="bd-mt-4 bd-w-full bd-justify-start [@container(max-width:800px)]:bd-mt-0 [@container(max-width:800px)]:bd-w-auto"><Icon name="settings" /><span>管理类型与阶段</span></Button>
+    <div className="bd-flex bd-shrink-0 bd-items-center bd-justify-between bd-gap-1 bd-pl-3"><span className="bd-text-xs bd-text-muted-foreground [@container(max-width:800px)]:bd-sr-only">按类型查看</span><Button variant="ghost" size="icon" data-action="type.create" aria-label="新建类型"><Icon name="plus" /></Button></div>
+    {state.types.map(type => <div key={type.id} data-type-row={type.id} className="bd-group bd-flex bd-min-w-0 bd-items-center bd-gap-0.5 [@container(max-width:800px)]:bd-w-48 [@container(max-width:800px)]:bd-shrink-0"><Button variant="ghost" data-board-type={type.id} data-type={type.id} aria-pressed={type.id === boardType} className="bd-min-w-0 bd-flex-1 bd-justify-start bd-px-2"><TypeIcon type={type} /><span className="type-name bd-min-w-0 bd-flex-1 bd-truncate bd-text-left" title={type.name}>{type.name}</span><Badge className="count bd-shrink-0 bd-border-transparent bd-bg-transparent bd-p-0">{selectItems(state, 'board', { ...filters, typeId: type.id }).length}</Badge></Button><Button variant="ghost" size="icon" data-action="type.settings" data-type-id={type.id} aria-label={`配置类型：${type.name}`} className="bd-opacity-0 bd-transition-opacity bd-duration-150 bd-ease-out group-hover:bd-opacity-100 group-focus-within:bd-opacity-100 [@media(hover:none)]:bd-opacity-100"><Icon name="edit" /></Button></div>)}
   </div>;
 }

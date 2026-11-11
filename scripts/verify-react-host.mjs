@@ -36,8 +36,8 @@ try {
     expect(b.x+b.width).toBeLessThanOrEqual(root.x+root.width+1);expect(Math.abs(b.x+b.width-a.x-a.width)).toBeLessThan(3);expect(b.y).toBeGreaterThanOrEqual(a.y+a.height);expect(b.y-a.y-a.height).toBeLessThan(12);
   });
   await page.keyboard.press('Escape');await expect(page.getByRole('menu')).toHaveCount(0);await sensorReady();
-  await check('header menu commands run once and settings restores persistent trigger',async()=>{
-    const trigger=page.locator('.header-secondary [data-menu-trigger]');await trigger.focus();await page.keyboard.press('Enter');await page.getByRole('menu').getByRole('menuitem',{name:'管理类型与阶段'}).focus();await page.keyboard.press('Enter');
+  await check('contextual settings opens from keyboard and restores persistent edit trigger',async()=>{
+    const trigger=page.locator('[data-type-row="software"] [data-action="type.settings"]');await trigger.focus();await page.keyboard.press('Enter');
     await expect(part('settings-dialog')).toBeVisible();await page.locator('[data-settings-action="close"]').click();await expect(trigger).toBeFocused();
   });
   await check('keyboard drag reaches adjacent empty stage and returns in one arrow',async()=>{

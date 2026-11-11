@@ -4,14 +4,18 @@ import { choose } from "./dialog";
 import { createElement as h } from "react";
 import { query } from "./dom";
 import { renderView, destroyView } from "./react-renderer";
-import { DetailFrame, DetailView, NoteLinks, StageOptions } from "./detail-view";
-interface DetailOptions { client: BuddeClient; notes: NoteBridge; onSaved(state: BuddeState): void; onClosed(): void }
+import { DetailFrame, DetailView, NoteLinks } from "./detail-view";
+interface DetailOptions { client: BuddeClient; notes: NoteBridge; onSaved(state: BuddeState): void; onSuccess(message: string): void; onClosed(): void }
 export function mountDetail(container: HTMLElement, options: DetailOptions) {
   const root = container.closest<HTMLElement>(".budde")!;
   const events = new AbortController(); const draft = new DraftSession();
   const $ = <T extends HTMLElement = HTMLElement>(selector: string) => query<T>(container, selector);
   let state: BuddeState; let editing = false; let guarding = false; let resolving = false; let reloading = false; let destroyed = false; let error = "";
-  let opener: HTMLElement | null = null; let openerId = ""; let modal = false; let renderedConfig = "";
+  let opener: HTMLElement | null = null; let openerId = ""; let modal = false; let renderedConfig = ""; let composing = false;
+  let editingTypes: BuddeState["types"] = [];
+  // Keep draft controls coherent across external config changes, without rebasing
+  // the draft/version. Writes still validate against the latest service state.
+  const presentationState = () => editing ? { ...state, types: editingTypes } : state;
   const background = () => root.querySelectorAll<HTMLElement>(".app-header,.capture-area,.main-panel");
   function layout() {
     if (destroyed) return;
@@ -49,8 +53,10 @@ export function mountDetail(container: HTMLElement, options: DetailOptions) {
     const busy = resolving || reloading || draft.status === "saving";
     $<HTMLButtonElement>("[data-detail-action=reload]").disabled = busy;
     container.setAttribute("aria-busy", String(busy));
+    const saveButton = container.querySelector<HTMLElement>('[data-part="detail-save"]');
+    if (saveButton) saveButton.dataset.dirty = String(draft.dirty && !busy);
     container.querySelectorAll<HTMLFieldSetElement>("fieldset").forEach(node => node.disabled = busy);
-    container.querySelectorAll<HTMLButtonElement>(".detail-heading button,.detail-footer button").forEach(button => button.disabled = busy);
+    container.querySelectorAll<HTMLButtonElement>(".detail-heading button,.detail-footer button,.stage-path button").forEach(button => button.disabled = busy);
   }
   function links() {
     if (!draft.item || destroyed) return;
@@ -60,12 +66,13 @@ export function mountDetail(container: HTMLElement, options: DetailOptions) {
     if (destroyed) return;
     const item = draft.item;
     if (!item) { renderView(container, h(DetailFrame, { open: false })); layout(); return; }
-    const type = state.types.find(entry => entry.id === item.typeId)!;
+    const viewState = presentationState();
+    const type = viewState.types.find(entry => entry.id === item.typeId)!;
     renderedConfig = JSON.stringify(type);
     const active = container.contains(document.activeElement) ? document.activeElement as HTMLElement : null;
     const focusKey = active?.dataset.part ? `[data-part="${CSS.escape(active.dataset.part)}"]` : active?.dataset.detailAction ? `[data-detail-action="${CSS.escape(active.dataset.detailAction)}"]` : active?.dataset.noteOpen ? `[data-note-open="${CSS.escape(active.dataset.noteOpen)}"]` : active?.classList.contains("detail-pane") ? ".detail-pane" : "";
     const scroll = container.querySelector(".detail-body")?.scrollTop ?? 0;
-    renderView(container, h(DetailFrame, { open: true }, h(DetailView, { key: item.id, state, item, editing })));
+    renderView(container, h(DetailFrame, { open: true }, h(DetailView, { key: item.id, state: viewState, item, editing })));
     links(); status(); layout();
     $(".detail-body").scrollTop = scroll;
     if (focusKey) container.querySelector<HTMLElement>(focusKey)?.focus({ preventScroll: true });
@@ -99,7 +106,11 @@ export function mountDetail(container: HTMLElement, options: DetailOptions) {
       const choice = await choose(root, "保存修改并执行？", `将保存当前修改，并${label}。取消保留所有输入与原状态。`, [{ value: "save", label: "保存修改并执行", primary: true }, { value: "cancel", label: "取消" }]);
       guarding = false; status(); if (destroyed || choice !== "save") return;
     }
-    await save(patch);
+    if (await save(patch) && !destroyed) {
+      if (patch.paused !== undefined) options.onSuccess(patch.paused ? "已暂停推进" : "已恢复推进");
+      else if (patch.reviewedAt !== undefined) options.onSuccess("已确认复查");
+      else if (patch.archived !== undefined) options.onSuccess(patch.archived ? "已归档" : "已移出归档");
+    }
   }
   async function reload() {
     if (blocked()) return; guarding = true;
@@ -118,8 +129,8 @@ export function mountDetail(container: HTMLElement, options: DetailOptions) {
   }, { signal: events.signal });
   container.addEventListener("change", event => {
     if (!editing || blocked()) return; const select = event.target as HTMLSelectElement;
-    if (select.dataset.part === "detail-type") { draft.edit({ typeId: select.value, stageId: "" }); renderView($("#detail-stage"), h(StageOptions, { state, typeId: select.value })); $<HTMLSelectElement>("#detail-stage").value = ""; }
-    if (select.dataset.part === "detail-stage") draft.edit({ stageId: select.value }); status();
+    if (select.dataset.part === "detail-type") { draft.edit({ typeId: select.value, stageId: "" }); render(); $<HTMLSelectElement>("#detail-stage").value = ""; }
+    if (select.dataset.part === "detail-stage") { draft.edit({ stageId: select.value }); render(); } status();
   }, { signal: events.signal });
   container.addEventListener("submit", event => { event.preventDefault(); void save(); }, { signal: events.signal });
   container.addEventListener("click", event => {
@@ -127,8 +138,12 @@ export function mountDetail(container: HTMLElement, options: DetailOptions) {
     const button = (event.target as Element).closest<HTMLButtonElement>("button"); if (!button || !draft.item || blocked()) return;
     const item = draft.item; const action = button.dataset.detailAction;
     if (action === "close") void requestClose();
-    if (action === "edit") { editing = true; render(); $("#detail-title").focus(); }
+    if (action === "edit") { editingTypes = state.types; editing = true; render(); $("#detail-title").focus(); }
     if (action === "cancel-edit") void (async () => { if (!await resolveDraft() || destroyed) return; draft.discard(state.items.find(entry => entry.id === item.id)); editing = false; error = ""; render(); $("[data-detail-action=edit]").focus(); })();
+    if (button.dataset.detailStageTarget) {
+      const stage = presentationState().types.find(type => type.id === item.typeId)?.stages.find(stage => stage.id === button.dataset.detailStageTarget);
+      if (stage && stage.id !== item.stageId) void apply({ stageId: stage.id }, `移至「${stage.name}」阶段`);
+    }
     if (action === "reload") void reload();
     if (action === "promote") void apply({ promoted: true }, "开始推进（阶段不变）");
     if (action === "pause") void apply({ paused: !item.paused }, item.paused ? "恢复推进" : "暂停");
@@ -143,9 +158,11 @@ export function mountDetail(container: HTMLElement, options: DetailOptions) {
       void options.notes.resolve(target).then(note => { if (destroyed || draft.item?.id !== item.id) return; draft.edit({ links: [...draft.item.links, { ...note, id: crypto.randomUUID(), role }] }); $<HTMLInputElement>("#note-target").value = ""; links(); }).catch(cause => { if (!destroyed) error = cause instanceof Error ? cause.message : String(cause); }).finally(() => { resolving = false; status(); });
     }
   }, { signal: events.signal });
+  container.addEventListener("compositionstart", () => composing = true, { signal: events.signal });
+  container.addEventListener("compositionend", () => composing = false, { signal: events.signal });
   container.addEventListener("keydown", event => {
     if (root.querySelector(".guard-dialog[open]")) return;
-    if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); void requestClose(); }
+    if (event.key === "Escape" && !composing && !event.isComposing && event.keyCode !== 229) { event.preventDefault(); event.stopPropagation(); void requestClose(); }
     if (event.key === "Tab" && modal) {
       const nodes = Array.from(container.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled)')).filter(node => node.getClientRects().length);
       if (event.shiftKey && (document.activeElement === nodes[0] || document.activeElement === $(".detail-pane"))) { event.preventDefault(); nodes.at(-1)?.focus(); }

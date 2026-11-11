@@ -10,7 +10,7 @@ import { Icon } from "../src/ui/components/icons";
 
 const root = process.cwd();
 
-test("brand renders the original shared sprout, not the generic Lucide sprout, without changing ordinary icons", async () => {
+test("brand renders the original shared sprout, not the generic Lucide sprout, while ordinary outline icons use the alpha.2 1.5px stroke", async () => {
   const brand = renderToStaticMarkup(createElement(Icon, { name: "brand" }));
   assert.doesNotMatch(brand, /lucide-sprout/, "the selected original sprout must replace the generic brand glyph");
   assert.match(brand, /width="24"/);
@@ -24,7 +24,8 @@ test("brand renders the original shared sprout, not the generic Lucide sprout, w
   const ordinary = renderToStaticMarkup(createElement(Icon, { name: "pool" }));
   assert.match(ordinary, /lucide-inbox/);
   assert.match(ordinary, /width="16"/);
-  assert.match(ordinary, /stroke-width="1.75"/);
+  assert.match(ordinary, /stroke-width="1.5"/);
+  assert.match(brand, /stroke-width="1.75"/);
 });
 
 test("production CSS embeds the unmodified offline Quicksand font and scopes the family to the wordmark", async () => {

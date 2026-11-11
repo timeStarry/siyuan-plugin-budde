@@ -1,4 +1,5 @@
 import type { BuddeClient, BuddeState, Command } from "../core/types";
+import type { StageTemplateId, TypeColor } from "../core/type-config";
 import { choose, fitDialog } from "./dialog";
 import { createElement as h } from "react";
 import { query } from "./dom";
@@ -6,7 +7,8 @@ import { renderView, destroyView } from "./react-renderer";
 import { SettingsView } from "./settings-view";
 
 type Operation = "type.create" | "type.update" | "type.delete" | "stage.add" | "stage.update" | "stage.delete";
-interface Values { name: string; initialStageId: string; completed: boolean; targetId: string }
+interface Values { name: string; initialStageId: string; completed: boolean; targetId: string; icon: string; color: string; template: string }
+export interface SettingsTarget { typeId?: string; kind: Operation; id?: string }
 export interface Editor { kind: Operation; id: string; values: Values; base: string }
 interface SettingsOptions { client: BuddeClient; onSaved(state: BuddeState): void; onClosed(): void; confirmDiscard(): Promise<boolean> }
 
@@ -55,7 +57,7 @@ export function mountSettings(dialog: HTMLDialogElement, options: SettingsOption
     if (destroyed) return;
     const focus = focusKey();
     if (!state.types.some((type) => type.id === active)) active = state.types[0].id;
-    renderView(dialog, h(SettingsView, { key: ++renderId, state, active, editor }));
+    renderView(dialog, h(SettingsView, { key: ++renderId, state, active, editor, onPresentationChange(patch: { icon?: string; color?: string }) { if (!editor || busy || guarding || destroyed) return; Object.assign(editor.values, patch); if (!conflict) error = ""; status(); } }));
     status();
     if (!busy) restoreFocus(focus);
   }
@@ -82,8 +84,9 @@ export function mountSettings(dialog: HTMLDialogElement, options: SettingsOption
     if (!editor) return true;
     const { kind, id, values } = editor;
     const expectedRevision = state.revision;
-    if (kind === "type.create") return commit({ kind, expectedRevision, name: values.name });
-    if (kind === "type.update") return commit({ kind, expectedRevision, id: active, name: values.name, initialStageId: values.initialStageId });
+    const presentation = { icon: values.icon || null, color: values.color ? values.color as TypeColor : null };
+    if (kind === "type.create") return commit({ kind, expectedRevision, name: values.name, ...presentation, template: values.template as StageTemplateId });
+    if (kind === "type.update") return commit({ kind, expectedRevision, id: active, name: values.name, initialStageId: values.initialStageId, ...presentation });
     if (kind === "type.delete") return commit({ kind, expectedRevision, id: active });
     if (kind === "stage.add") return commit({ kind, expectedRevision, typeId: active, name: values.name });
     if (kind === "stage.update") return commit({ kind, expectedRevision, typeId: active, id, name: values.name, completed: values.completed });
@@ -109,7 +112,8 @@ export function mountSettings(dialog: HTMLDialogElement, options: SettingsOption
     if (!await resolveEditor()) return;
     const type = current();
     const stage = type.stages.find((entry) => entry.id === id);
-    const values = { name: kind === "type.update" ? type.name : kind === "stage.update" ? stage!.name : "", initialStageId: type.initialStageId, completed: stage?.completed ?? false, targetId: "" };
+    if ((kind === "stage.update" || kind === "stage.delete") && !stage) throw new Error("该阶段已变化，请重新读取配置。");
+    const values = { name: kind === "type.update" ? type.name : kind === "stage.update" ? stage!.name : "", initialStageId: type.initialStageId, completed: stage?.completed ?? false, targetId: "", icon: kind === "type.update" ? type.icon ?? "" : "", color: kind === "type.update" ? type.color ?? "" : "", template: "basic" };
     editor = { kind, id, values, base: JSON.stringify(values) };
     error = ""; conflict = false; render();
     dialog.querySelector<HTMLElement>("[data-editor-field]")?.focus();
@@ -164,15 +168,18 @@ export function mountSettings(dialog: HTMLDialogElement, options: SettingsOption
     })();
   }, { signal: events.signal });
   return {
-    async open(): Promise<void> {
+    async open(target?: SettingsTarget): Promise<void> {
       if (destroyed || opening || dialog.open) return;
       opening = true;
       try {
         const latest = await options.client.snapshot();
         if (destroyed) return;
-        state = latest; editor = undefined; error = ""; conflict = false;
+        if (target?.typeId && !latest.types.some(type => type.id === target.typeId)) throw new Error("该类型已变化，请重新读取配置。");
+        if (target?.kind.startsWith('stage.') && !latest.types.find(type => type.id === target.typeId)?.stages.some(stage => stage.id === target.id)) throw new Error("该阶段已变化，请重新读取配置。");
+        state = latest; if (target?.typeId) active = target.typeId; editor = undefined; error = ""; conflict = false;
         render(); release = fitDialog(dialog);
-        dialog.querySelector<HTMLElement>(`[data-settings-type="${CSS.escape(active)}"]`)?.focus();
+        if (target) await start(target.kind, target.id);
+        else dialog.querySelector<HTMLElement>(`[data-settings-type="${CSS.escape(active)}"]`)?.focus();
       } finally { opening = false; }
     }, requestClose,
     destroy(): void { destroyed = true; release(); events.abort(); if (dialog.open) dialog.close(); destroyView(dialog); dialog.replaceChildren(); },

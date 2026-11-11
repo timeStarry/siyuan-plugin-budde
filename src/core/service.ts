@@ -9,6 +9,19 @@ import type {
   StateStore,
 } from "./types";
 
+import { isTypeColor, isTypeIcon, STAGE_TEMPLATES } from "./type-config";
+
+function applyPresentation(type: ItemType, patch: { icon?: string | null; color?: ItemType["color"] | null }) {
+  if (patch.icon !== undefined) {
+    if (patch.icon === null) delete type.icon;
+    else { if (!isTypeIcon(patch.icon)) fail("类型图标须为精选图标名称或单个 Emoji。"); type.icon = patch.icon; }
+  }
+  if (patch.color !== undefined) {
+    if (patch.color === null) delete type.color;
+    else { if (!isTypeColor(patch.color)) fail("类型颜色无效。"); type.color = patch.color; }
+  }
+}
+
 export class BuddeError extends Error {
   constructor(
     public readonly code:
@@ -101,6 +114,8 @@ export function validateState(value: unknown): BuddeState {
     object(type);
     name(type.id, "类型 ID", 200);
     name(type.name);
+    if (type.icon !== undefined && !isTypeIcon(type.icon)) fail("类型图标须为精选图标名称或单个 Emoji。");
+    if (type.color !== undefined && !isTypeColor(type.color)) fail("类型颜色无效。");
     if (!Array.isArray(type.stages) || type.stages.length === 0)
       fail("每种类型至少保留一个阶段。");
     for (const stage of type.stages as unknown[]) {
@@ -333,21 +348,17 @@ export class BuddeService implements BuddeClient {
         if (!("expectedRevision" in command)) fail("命令无效。");
         checkVersion(state.revision, command.expectedRevision);
         if (command.kind === "type.create") {
+          const template = command.template === undefined ? "basic" : command.template;
+          if (typeof template !== "string" || !Object.hasOwn(STAGE_TEMPLATES, template)) fail("阶段模板无效。");
           const id = this.uuid();
-          const first = this.uuid();
-          const last = this.uuid();
-          state.types.push({
-            id,
-            name: name(command.name),
-            initialStageId: first,
-            stages: [
-              { id: first, name: "想法", completed: false },
-              { id: last, name: "完成", completed: true },
-            ],
-          });
+          const stages = STAGE_TEMPLATES[template].stages.map(stage => ({ ...stage, id: this.uuid() }));
+          const type: ItemType = { id, name: name(command.name), initialStageId: stages[0].id, stages };
+          applyPresentation(type, command);
+          state.types.push(type);
         } else if (command.kind === "type.update") {
           const type = findType(state, command.id);
           type.name = name(command.name);
+          applyPresentation(type, command);
           if (command.initialStageId !== undefined) {
             if (!type.stages.some((s) => s.id === command.initialStageId))
               fail("初始阶段不存在。");
