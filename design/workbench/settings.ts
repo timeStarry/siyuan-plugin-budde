@@ -1,5 +1,5 @@
 import type { BuddeClient, BuddeState, Command } from "../../src/core/types";
-import { choose } from "./dialog";
+import { choose, fitDialog } from "./dialog";
 import { escape } from "./view";
 
 type Operation = "type.create" | "type.update" | "type.delete" | "stage.add" | "stage.update" | "stage.delete";
@@ -9,6 +9,7 @@ interface SettingsOptions { client: BuddeClient; onSaved(state: BuddeState): voi
 
 export function mountSettings(dialog: HTMLDialogElement, options: SettingsOptions) {
   const events = new AbortController();
+  let release = () => {};
   let state: BuddeState;
   let active = "software";
   let editor: Editor | undefined;
@@ -47,17 +48,35 @@ export function mountSettings(dialog: HTMLDialogElement, options: SettingsOption
       ${editor.kind === "stage.delete" ? `<label for="setting-target">迁移目标阶段</label><select id="setting-target" data-editor-field="targetId"><option value="">请选择迁移目标</option>${type.stages.filter((entry) => entry.id !== editor!.id).map((entry) => `<option value="${escape(entry.id)}" ${entry.id === values.targetId ? "selected" : ""}>${escape(entry.name)}</option>`).join("")}</select>` : ""}
       <div class="setting-form-actions"><button type="submit" class="${deleting ? "danger-button" : "primary"}" ${blocked ? "disabled" : ""}>${deleting ? typeOperation ? "确认删除类型" : "确认删除并迁移" : "保存设置"}</button><button type="button" data-settings-action="cancel-editor">取消编辑</button></div></form>`;
   }
+  function focusKey(): string {
+    const node = document.activeElement as HTMLElement | null;
+    if (!node || !dialog.contains(node)) return "";
+    if (node.id) return `#${CSS.escape(node.id)}`;
+    if (node.dataset.settingsType) return `[data-settings-type="${CSS.escape(node.dataset.settingsType)}"]`;
+    if (node.dataset.settingsAction) return `[data-settings-action="${CSS.escape(node.dataset.settingsAction)}"]${node.dataset.id ? `[data-id="${CSS.escape(node.dataset.id)}"]` : ""}`;
+    if (node.dataset.editorField) return `[data-editor-field="${CSS.escape(node.dataset.editorField)}"]`;
+    return node.matches('#settings-form button[type="submit"]') ? '#settings-form button[type="submit"]' : "";
+  }
+  function restoreFocus(key: string): void {
+    if (!dialog.open) return;
+    let target = key ? dialog.querySelector<HTMLElement>(key) : null;
+    if (target?.matches(":disabled")) target = target.closest("[data-stage-row]")?.querySelector<HTMLElement>("button:not(:disabled)") ?? null;
+    (target ?? dialog.querySelector<HTMLElement>(`[data-settings-type="${CSS.escape(active)}"]`))?.focus();
+  }
   function render(): void {
+    const focus = focusKey();
     if (!state.types.some((type) => type.id === active)) active = state.types[0].id;
     const type = current();
-    dialog.innerHTML = `<div class="settings-header"><div><h2>管理类型与阶段</h2><p class="field-help">载入版本 ${state.revision} · <span id="settings-status" role="status"></span></p></div><div><button data-settings-action="reload">重新读取设置</button><button class="icon-button" data-settings-action="close" aria-label="关闭设置">×</button></div></div>
+    dialog.innerHTML = `<div class="settings-header"><div><h2>管理类型与阶段</h2><p class="field-help">载入版本 ${state.revision} · <span id="settings-status" role="status"></span></p></div><div><details class="more settings-demo"><summary>演示工具</summary><div class="menu"><button data-settings-action="simulate">模拟外部配置变化</button></div></details><button data-settings-action="reload">重新读取设置</button><button class="icon-button" data-settings-action="close" aria-label="关闭设置">×</button></div></div>
       <fieldset id="settings-controls" class="settings-body"><aside class="settings-types" aria-label="类型列表">${state.types.map((entry) => `<button data-settings-type="${escape(entry.id)}" aria-pressed="${entry.id === active}">${escape(entry.name)}</button>`).join("")}<button class="new-type" data-settings-action="type.create"><span aria-hidden="true">＋</span> 新建类型</button></aside>
       <section class="settings-content"><div class="settings-type-heading"><h3>${escape(type.name)}</h3><button data-settings-action="type.update">编辑类型</button><button class="quiet" data-settings-action="type.delete">删除类型</button></div><p class="field-help">初始阶段控制新建落点；完成标记与排列位置无关。</p>
       <ol class="stage-list">${type.stages.map((stage, index) => `<li data-stage-row="${escape(stage.id)}"><div class="stage-description"><span>${escape(stage.name)}</span><small>${stage.id === type.initialStageId ? "初始阶段" : ""}${stage.id === type.initialStageId && stage.completed ? " · " : ""}${stage.completed ? "完成阶段" : ""}</small></div><div class="stage-controls"><button class="icon-button" data-settings-action="up" data-id="${escape(stage.id)}" aria-label="上移阶段：${escape(stage.name)}" ${index === 0 ? "disabled" : ""}>↑</button><button class="icon-button" data-settings-action="down" data-id="${escape(stage.id)}" aria-label="下移阶段：${escape(stage.name)}" ${index === type.stages.length - 1 ? "disabled" : ""}>↓</button><button data-settings-action="stage.update" data-id="${escape(stage.id)}">编辑</button><button data-settings-action="stage.delete" data-id="${escape(stage.id)}" ${type.stages.length === 1 ? "disabled" : ""}>删除</button></div></li>`).join("")}</ol><button data-settings-action="stage.add"><span aria-hidden="true">＋</span> 新增阶段</button><div id="settings-editor">${editorMarkup()}</div><div id="settings-error" role="alert" hidden></div></section></fieldset>`;
     status();
+    if (!busy) restoreFocus(focus);
   }
   async function commit(command: Command): Promise<boolean> {
     if (busy) return false;
+    const focus = focusKey();
     busy = true; error = ""; conflict = false; status();
     try {
       const result = await options.client.execute(command);
@@ -71,7 +90,7 @@ export function mountSettings(dialog: HTMLDialogElement, options: SettingsOption
       error = cause instanceof Error ? cause.message : String(cause);
       conflict = typeof cause === "object" && cause !== null && "code" in cause && cause.code === "CONFLICT";
       return false;
-    } finally { busy = false; status(); }
+    } finally { busy = false; status(); restoreFocus(focus); }
   }
   async function save(): Promise<boolean> {
     if (!editor) return true;
@@ -111,7 +130,7 @@ export function mountSettings(dialog: HTMLDialogElement, options: SettingsOption
   async function requestClose(): Promise<boolean> {
     if (!dialog.open) return true;
     if (!await resolveEditor()) return false;
-    editor = undefined; dialog.close(); options.onClosed();
+    editor = undefined; release(); dialog.close(); options.onClosed();
     return true;
   }
   async function reload(): Promise<void> {
@@ -123,7 +142,7 @@ export function mountSettings(dialog: HTMLDialogElement, options: SettingsOption
     busy = true; status();
     try { state = await options.client.snapshot(); editor = undefined; error = ""; conflict = false; render(); options.onSaved(state); }
     catch (cause) { error = cause instanceof Error ? cause.message : String(cause); }
-    finally { busy = false; status(); }
+    finally { busy = false; status(); restoreFocus('[data-settings-action="reload"]'); }
   }
   function edit(event: Event): void {
     const input = event.target as HTMLInputElement | HTMLSelectElement;
@@ -144,6 +163,17 @@ export function mountSettings(dialog: HTMLDialogElement, options: SettingsOption
     if (button.dataset.settingsType) void (async () => { if (await resolveEditor()) { active = button.dataset.settingsType!; editor = undefined; error = ""; conflict = false; render(); } })();
     const action = button.dataset.settingsAction;
     if (action?.startsWith("type.") || action?.startsWith("stage.")) void start(action as Operation, button.dataset.id);
+    if (action === "simulate") void (async () => {
+      busy = true; status();
+      try {
+        const latest = await options.client.snapshot();
+        const type = latest.types[0];
+        const result = await options.client.execute({ kind: "type.update", expectedRevision: latest.revision, id: type.id, name: `${type.name} · 外部修改` });
+        options.onSaved(result.state);
+        conflict = true; error = "已模拟外部配置变化。本地输入与载入版本保留，请尝试保存或明确重新读取。";
+      } catch (cause) { error = cause instanceof Error ? cause.message : String(cause); }
+      finally { busy = false; status(); }
+    })();
     if (action === "close") void requestClose();
     if (action === "reload") void reload();
     if (action === "cancel-editor") void (async () => { if (await resolveEditor()) { editor = undefined; error = ""; conflict = false; render(); } })();
@@ -161,9 +191,9 @@ export function mountSettings(dialog: HTMLDialogElement, options: SettingsOption
     async open(): Promise<void> {
       if (dialog.open) return;
       state = await options.client.snapshot(); editor = undefined; error = ""; conflict = false;
-      render(); dialog.showModal();
+      render(); release = fitDialog(dialog); dialog.showModal();
       dialog.querySelector<HTMLElement>(`[data-settings-type="${CSS.escape(active)}"]`)?.focus();
     }, requestClose,
-    destroy(): void { events.abort(); if (dialog.open) dialog.close(); dialog.replaceChildren(); },
+    destroy(): void { release(); events.abort(); if (dialog.open) dialog.close(); dialog.replaceChildren(); },
   };
 }

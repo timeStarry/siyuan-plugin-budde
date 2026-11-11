@@ -33,10 +33,12 @@ export function mountPrototype(root: HTMLElement, session: DemoSession): { refre
       <div class="collection-frame"><aside id="type-index" aria-label="看板类型"></aside><div id="collection" tabindex="-1" aria-label="事项列表"></div></div>
       <p id="board-hint" class="board-hint" hidden>拖动卡片改变阶段，也可以在详情中选择。不同类型保留各自的生命周期。</p>
     </section><div id="detail-host"></div></main>
-    <footer class="demo-footer"><span>独立交互原型 · 示例数据，刷新重置</span><details id="demo-tools" class="more"><summary>演示工具</summary><div class="menu demo-menu"><p>以下仅用于演示与验证</p><button data-demo-fault="reject-next">下次保存失败</button><button data-demo-fault="lose-response">下次响应丢失</button><button data-demo="external" disabled>模拟外部修改</button><button data-demo="reset">重置示例数据</button></div></details></footer>
+    <footer class="demo-footer"><span>独立交互原型 · 示例数据，刷新重置</span><details id="demo-tools" class="more"><summary>演示工具</summary><div class="menu demo-menu"><p>以下仅用于演示与验证</p><div class="theme-switch"><button data-demo-theme="light">浅色演示</button><button data-demo-theme="dark">深色演示</button></div><button data-demo-fault="reject-next">下次保存失败</button><button data-demo-fault="lose-response">下次响应丢失</button><button data-demo="external" disabled>模拟外部修改</button><button data-demo="reset">重置示例数据</button></div></details></footer>
     <div id="modal-host"></div><dialog id="settings-dialog" aria-label="管理类型与阶段"></dialog>
   </div>`;
   const $ = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
+  const initialTheme = document.documentElement.dataset.demoTheme ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  root.querySelectorAll<HTMLButtonElement>("[data-demo-theme]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.demoTheme === initialTheme)));
   const captureInput = $<HTMLInputElement>("#capture-title");
   const createType = $<HTMLSelectElement>("#create-type");
   const search = $<HTMLInputElement>("#title-search");
@@ -47,10 +49,11 @@ export function mountPrototype(root: HTMLElement, session: DemoSession): { refre
     onSaved(next) { state = next; render(); },
     onClosed() { selected = ""; render(); },
   });
+  let settingsOpener = "header .more summary";
   const settings = mountSettings($<HTMLDialogElement>("#settings-dialog"), {
     client: session.client,
     onSaved(next) { state = next; render(); },
-    onClosed() { root.querySelector<HTMLElement>("header .more summary")?.focus(); },
+    onClosed() { root.querySelector<HTMLElement>(settingsOpener)?.focus(); },
     async confirmDiscard() {
       return await choose("放弃设置草稿并读取最新配置？", "尚未保存的设置输入会被丢弃。不会覆盖其他操作已经提交的配置。", [{ value: "reload", label: "放弃并读取" }, { value: "cancel", label: "继续编辑" }], "cancel") === "reload";
     },
@@ -125,6 +128,10 @@ export function mountPrototype(root: HTMLElement, session: DemoSession): { refre
       }
     })();
   }) as EventListener);
+  listen("keydown", ((event: KeyboardEvent) => {
+    const menu = (event.target as Element).closest<HTMLDetailsElement>(".more[open],.card-menu[open]");
+    if (event.key === "Escape" && menu) { event.preventDefault(); menu.open = false; menu.querySelector<HTMLElement>("summary")?.focus(); }
+  }) as EventListener);
   listen("compositionstart", (() => { composing = true; }) as EventListener);
   listen("compositionend", (() => { composing = false; }) as EventListener);
   listen("keydown", ((event: KeyboardEvent) => {
@@ -154,6 +161,10 @@ export function mountPrototype(root: HTMLElement, session: DemoSession): { refre
       if (item && await detail.open(item)) { selected = item.id; render(); }
     })();
     if (button.dataset.stageItem && button.dataset.stageTarget) void mutate(button.dataset.stageItem, { stageId: button.dataset.stageTarget });
+    if (button.dataset.demoTheme) {
+      document.documentElement.dataset.demoTheme = button.dataset.demoTheme;
+      root.querySelectorAll<HTMLButtonElement>("[data-demo-theme]").forEach((entry) => entry.setAttribute("aria-pressed", String(entry.dataset.demoTheme === button.dataset.demoTheme)));
+    }
     if (button.dataset.demoFault) { session.armFault(button.dataset.demoFault as "reject-next" | "lose-response"); notify("已启用一次模拟故障，仅影响下一次修改操作。"); }
     if (button.dataset.demo === "external" && selected) void session.simulateExternalChange(selected).then(refresh).catch((error: Error) => notify(error.message, true));
     if (button.dataset.demo === "reset") void (async () => {
@@ -161,7 +172,10 @@ export function mountPrototype(root: HTMLElement, session: DemoSession): { refre
       if (answer === "reset" && await detail.requestClose()) { await session.reset(); request.success(); captureInput.value = ""; await refresh(); notify("示例数据已重置。"); }
     })();
     if (button.dataset.promote) void mutate(button.dataset.promote, { promoted: true });
-    if (button.dataset.action === "settings") void (async () => { if (await detail.requestClose()) await settings.open(); })();
+    if (button.dataset.action === "settings") {
+      const opener = button.closest("#type-index") ? '#type-index [data-action="settings"]' : "header .more summary";
+      void (async () => { if (await detail.requestClose()) { settingsOpener = opener; await settings.open(); } })();
+    }
     if (button.dataset.action === "export") void (async () => {
       try {
         const data = await session.client.exportData();
