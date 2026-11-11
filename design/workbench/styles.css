@@ -173,3 +173,46 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .demo-menu p { font-size: 12px; padding: 0 8px; }
 .demo-menu button { font-size: 12px; }
 @container budde (max-width: 719px) { #detail-host.is-overlay .detail-pane { width: 100%; border-left: 0; } }
+#settings-dialog { width: min(920px, calc(100vw - 40px)); max-height: calc(100dvh - 40px); height: 760px; padding: 0; border: 1px solid var(--b3-border-color); border-radius: 6px; background: var(--b3-theme-background); color: var(--b3-theme-on-background); }
+#settings-dialog[open] { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.settings-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--b3-border-color); padding: 20px 24px; }
+.settings-header h2 { font-size: 20px; margin: 0; font-weight: 600; }
+.settings-header p { margin: 8px 0 0; }
+.settings-header > div:last-child { display: flex; gap: 10px; align-items: center; }
+.settings-header button { font-size: 12px; }
+.settings-body { display: grid; grid-template-columns: 160px minmax(0, 1fr); min-height: 0; }
+.settings-types { background: var(--b3-theme-surface); border-right: 1px solid var(--b3-border-color); padding: 16px 10px; overflow: auto; }
+.settings-types button { display: block; width: 100%; text-align: left; background: transparent; border-color: transparent; margin-bottom: 4px; overflow-wrap: anywhere; }
+.settings-types button[aria-pressed="true"] { background: var(--b3-theme-background); border-color: var(--b3-border-color); color: var(--b3-theme-primary); }
+.settings-types button.new-type { font-size: 12px; border-top: 1px solid var(--b3-border-color); margin-top: 20px; padding-top: 12px; border-radius: 0; }
+.settings-content { min-width: 0; overflow: auto; padding: 24px; overscroll-behavior: contain; }
+.settings-type-heading { display: flex; align-items: center; gap: 8px; }
+.settings-type-heading h3 { font-size: 16px; font-weight: 600; margin: 0 auto 0 0; overflow-wrap: anywhere; min-width: 0; }
+.settings-type-heading button { font-size: 12px; flex-shrink: 0; }
+.stage-list { padding: 0; list-style: none; margin: 24px 0 16px; }
+.stage-list li { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--b3-border-color); padding: 10px 0; }
+.stage-description { min-width: 0; overflow-wrap: anywhere; }
+.stage-description small { display: block; font-size: 12px; color: var(--b3-theme-on-surface); margin-top: 4px; }
+.stage-controls { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+.stage-controls button:not(.icon-button) { font-size: 12px; padding: 5px 9px; }
+#settings-editor { margin-top: 24px; }
+#settings-form { padding: 20px; border: 1px solid var(--b3-border-color); border-radius: 5px; background: var(--b3-theme-surface); }
+#settings-form h3 { font-size: 16px; margin: 0 0 20px; font-weight: 500; overflow-wrap: anywhere; }
+#settings-form label { display: block; font-size: 12px; margin: 16px 0 8px; color: var(--b3-theme-on-surface); }
+#settings-form input:not([type="checkbox"]), #settings-form select { width: 100%; }
+#settings-form .checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--b3-theme-on-background); }
+#settings-form input[type="checkbox"] { width: 18px; height: 18px; min-height: 18px; accent-color: var(--b3-theme-primary); }
+.setting-form-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.danger-button { color: var(--budde-danger); }
+.settings-idle { color: var(--b3-theme-on-surface); font-size: 12px; line-height: 1.8; border-top: 1px solid var(--b3-border-color); padding-top: 16px; }
+#settings-error { color: var(--budde-danger); margin-top: 16px; font-size: 12px; line-height: 1.8; }
+@media (max-width: 719px) {
+  #settings-dialog { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
+  .settings-header { padding: 16px; flex-wrap: wrap; }
+  .settings-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .settings-types { display: flex; gap: 4px; padding: 8px; border-right: 0; border-bottom: 1px solid var(--b3-border-color); overflow-x: auto; }
+  .settings-types button { flex-shrink: 0; width: auto; }
+  .settings-types button.new-type { margin: 0; padding: 7px 12px; border-top: 0; }
+  .settings-content { padding: 16px; }
+  .stage-list li { flex-wrap: wrap; gap: 8px; }
+}

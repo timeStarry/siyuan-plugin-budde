@@ -3,6 +3,7 @@ import { CaptureRequest, createDemoSession, selectItems, type DemoSession, type 
 import { escape, renderItems, sprout } from "./view";
 import { mountDetail } from "./detail";
 import { choose } from "./dialog";
+import { mountSettings } from "./settings";
 
 declare global {
   interface Window { buddePrototype: { client: BuddeClient; refresh(): Promise<void>; reset(): Promise<BuddeState> } }
@@ -22,7 +23,7 @@ export function mountPrototype(root: HTMLElement, session: DemoSession): { refre
   root.innerHTML = `<div class="workbench">
     <header class="app-header"><div class="brand">${sprout}<span>Budde</span></div>
       <nav aria-label="主视图"><button data-view="pool">想法池</button><button data-view="board">看板</button><button data-view="active">正在推进</button></nav>
-      <div class="header-secondary"><button data-view="archive" class="quiet">归档</button><details class="more"><summary>更多</summary><div class="menu"><button data-action="settings" disabled>管理类型与阶段</button><button data-action="export" disabled>导出 JSON</button></div></details></div>
+      <div class="header-secondary"><button data-view="archive" class="quiet">归档</button><details class="more"><summary>更多</summary><div class="menu"><button data-action="settings">管理类型与阶段</button><button data-action="export">导出 JSON</button></div></details></div>
     </header>
     <section class="capture-area" aria-label="快速记录"><form id="capture" novalidate><span class="capture-plus" aria-hidden="true">＋</span><input id="capture-title" aria-label="想法标题" placeholder="记下一个想法，标题就够了" autocomplete="off"><label class="capture-type">新事项类型<select id="create-type" aria-label="新事项类型"></select></label><button class="primary" type="submit">记下来</button></form>
       <div class="capture-feedback"><div id="notice" role="status" aria-live="polite"></div><div id="error" role="alert" hidden></div></div>
@@ -46,11 +47,19 @@ export function mountPrototype(root: HTMLElement, session: DemoSession): { refre
     onSaved(next) { state = next; render(); },
     onClosed() { selected = ""; render(); },
   });
+  const settings = mountSettings($<HTMLDialogElement>("#settings-dialog"), {
+    client: session.client,
+    onSaved(next) { state = next; render(); },
+    onClosed() { root.querySelector<HTMLElement>("header .more summary")?.focus(); },
+    async confirmDiscard() {
+      return await choose("放弃设置草稿并读取最新配置？", "尚未保存的设置输入会被丢弃。不会覆盖其他操作已经提交的配置。", [{ value: "reload", label: "放弃并读取" }, { value: "cancel", label: "继续编辑" }], "cancel") === "reload";
+    },
+  });
   const listen = (name: string, listener: EventListener) => root.addEventListener(name, listener, { signal: events.signal });
-  function notify(message: string, error = false): void {
+  function notify(message: string, error = false, showPool = false): void {
     $("#error").hidden = !error;
     $("#error").textContent = error ? message : "";
-    $("#notice").innerHTML = error ? "" : `${escape(message)}${message && view !== "pool" ? ' <button class="inline-link" data-view="pool">查看想法池</button>' : ""}`;
+    $("#notice").innerHTML = error ? "" : `${escape(message)}${message && showPool && view !== "pool" ? ' <button class="inline-link" data-view="pool">查看想法池</button>' : ""}`;
   }
   function render(): void {
     if (!state.types.some((type) => type.id === boardType)) boardType = state.types[0].id;
@@ -72,7 +81,7 @@ export function mountPrototype(root: HTMLElement, session: DemoSession): { refre
     $("#result-count").textContent = `${selectItems(state, view, currentFilters).length} 个事项`;
     $("#type-index").hidden = view !== "board";
     $("#board-hint").hidden = view !== "board";
-    $("#type-index").innerHTML = `<p class="index-label">按类型查看</p>${state.types.map((entry) => `<button data-board-type="${escape(entry.id)}" aria-pressed="${entry.id === boardType}"><span>${escape(entry.name)}</span><span>${selectItems(state, "board", { ...filters, typeId: entry.id }).length}</span></button>`).join("")}<button class="manage-types" data-action="settings" disabled>管理类型与阶段</button>`;
+    $("#type-index").innerHTML = `<p class="index-label">按类型查看</p>${state.types.map((entry) => `<button data-board-type="${escape(entry.id)}" aria-pressed="${entry.id === boardType}"><span>${escape(entry.name)}</span><span>${selectItems(state, "board", { ...filters, typeId: entry.id }).length}</span></button>`).join("")}<button class="manage-types" data-action="settings">管理类型与阶段</button>`;
     const position = { top: collection.scrollTop, left: collection.scrollLeft };
     collection.className = view === "board" ? "board-collection" : "list-collection";
     collection.innerHTML = renderItems(state, view, currentFilters, selected);
@@ -106,7 +115,7 @@ export function mountPrototype(root: HTMLElement, session: DemoSession): { refre
         state = (await session.client.execute(request.prepare(captureInput.value, captureType))).state;
         request.success();
         captureInput.value = "";
-        notify("已记入想法池，尚未开始推进。继续记录下一条吧。");
+        notify("已记入想法池，尚未开始推进。继续记录下一条吧。", false, true);
         render();
       } catch (error) { notify(error instanceof Error ? error.message : String(error), true); }
       finally {
@@ -152,6 +161,16 @@ export function mountPrototype(root: HTMLElement, session: DemoSession): { refre
       if (answer === "reset" && await detail.requestClose()) { await session.reset(); request.success(); captureInput.value = ""; await refresh(); notify("示例数据已重置。"); }
     })();
     if (button.dataset.promote) void mutate(button.dataset.promote, { promoted: true });
+    if (button.dataset.action === "settings") void (async () => { if (await detail.requestClose()) await settings.open(); })();
+    if (button.dataset.action === "export") void (async () => {
+      try {
+        const data = await session.client.exportData();
+        const url = URL.createObjectURL(new Blob([data], { type: "application/json" }));
+        const link = document.createElement("a"); link.href = url; link.download = "budde-demo.json"; link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+        notify("已导出演示 JSON，不包含思源笔记正文。");
+      } catch (error) { notify(error instanceof Error ? error.message : String(error), true); }
+    })();
     if (button.dataset.action === "focus-capture") captureInput.focus();
     if (button.dataset.action === "clear-filters") { filters.query = ""; filters.typeId = ""; filters.unpromotedOnly = false; render(); search.focus(); }
   }) as EventListener);
@@ -168,7 +187,7 @@ export function mountPrototype(root: HTMLElement, session: DemoSession): { refre
     event.preventDefault();
     if (item.stageId !== stage.dataset.stageId) void mutate(item.id, { stageId: stage.dataset.stageId });
   }) as EventListener);
-  return { refresh, destroy() { detail.destroy(); events.abort(); root.replaceChildren(); } };
+  return { refresh, destroy() { settings.destroy(); detail.destroy(); events.abort(); root.replaceChildren(); } };
 }
 
 const session = createDemoSession();

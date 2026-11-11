@@ -238,6 +238,138 @@ groups.detail = async (page, output) => {
   assert.equal(await field("想法标题").inputValue(), "");
 };
 
+groups.settings = async (page, output) => {
+  const ui = page.locator("#settings-dialog");
+  const field = (name) => ui.getByLabel(name, { exact: true });
+  const click = (name) => ui.getByRole("button", { name, exact: true }).click();
+  const selectType = (id) => ui.locator(`[data-settings-type="${id}"]`).click();
+  const stage = (id) => ui.locator(`[data-stage-row="${id}"]`);
+  const open = async () => {
+    await page.locator("header .more summary").click();
+    await page.getByRole("button", { name: "管理类型与阶段", exact: true }).click();
+  };
+  await open();
+  await selectType("software");
+  await click("编辑类型");
+  await field("类型名称").fill("本地设置草稿");
+  await page.evaluate(() => window.buddePrototype.refresh());
+  assert.equal(await field("类型名称").inputValue(), "本地设置草稿");
+  await field("类型名称").press("Escape");
+  await page.getByRole("button", { name: "继续编辑", exact: true }).click();
+  assert.equal(await field("类型名称").inputValue(), "本地设置草稿");
+  await page.evaluate(async () => {
+    const state = await window.buddePrototype.client.snapshot();
+    await window.buddePrototype.client.execute({ kind: "type.update", id: "general", name: "通用（外部）", expectedRevision: state.revision });
+    await window.buddePrototype.refresh();
+  });
+  await click("保存设置");
+  assert.match(await ui.locator("#settings-status").innerText(), /版本/);
+  assert.equal(await field("类型名称").inputValue(), "本地设置草稿");
+  await click("重新读取设置");
+  await page.getByRole("button", { name: "继续编辑", exact: true }).click();
+  assert.equal(await field("类型名称").inputValue(), "本地设置草稿");
+  await click("重新读取设置");
+  await page.getByRole("button", { name: "放弃并读取", exact: true }).click();
+  await click("编辑类型");
+  await field("类型名称").fill("软件 <b>字面文本</b>");
+  await click("保存设置");
+  assert.equal((await snapshot(page)).types.find((type) => type.id === "software").name, "软件 <b>字面文本</b>");
+  assert.equal(await ui.locator("b").count(), 0);
+
+  const createType = async () => {
+    await click("新建类型"); await field("类型名称").fill("自定义"); await click("保存设置");
+    return (await snapshot(page)).types.at(-1);
+  };
+  const first = await createType();
+  const second = await createType();
+  assert.notEqual(first.id, second.id);
+  await click("新增阶段");
+  await field("阶段名称").fill("<b>检验</b>");
+  await click("保存设置");
+  let type = (await snapshot(page)).types.find((entry) => entry.id === second.id);
+  const added = type.stages.at(-1);
+  assert.equal(await stage(added.id).innerText().then((text) => text.includes("<b>检验</b>")), true);
+  assert.equal(await ui.locator("b").count(), 0);
+  await stage(added.id).getByRole("button", { name: "编辑", exact: true }).click();
+  await field("阶段名称").fill("完成");
+  await field("完成阶段").check();
+  await click("保存设置");
+  await stage(added.id).getByRole("button", { name: "上移阶段：完成", exact: true }).click();
+  await stage(added.id).getByRole("button", { name: "上移阶段：完成", exact: true }).click();
+  type = (await snapshot(page)).types.find((entry) => entry.id === second.id);
+  assert.equal(type.stages[0].id, added.id);
+  assert.equal(type.stages[0].completed, true);
+  assert.equal(type.initialStageId, second.initialStageId);
+  await click("编辑类型");
+  await field("初始阶段").selectOption(added.id);
+  await click("保存设置");
+  type = (await snapshot(page)).types.find((entry) => entry.id === second.id);
+  assert.equal(type.initialStageId, added.id);
+  assert.equal(type.stages[0].completed, true);
+  await click("删除类型");
+  await click("确认删除类型");
+  assert.equal((await snapshot(page)).types.some((entry) => entry.id === second.id), false);
+  assert.equal((await snapshot(page)).types.some((entry) => entry.id === first.id), true);
+
+  await click("关闭设置");
+  await page.evaluate(async (typeId) => {
+    const result = await window.buddePrototype.client.execute({ kind: "item.create", title: "仅归档的类型引用", typeId, requestId: "archived-reference-request" });
+    await window.buddePrototype.client.execute({ kind: "item.update", id: result.itemId, expectedVersion: 1, patch: { archived: true } });
+    await window.buddePrototype.refresh();
+  }, first.id);
+  await open(); await selectType(first.id); await click("删除类型");
+  assert.equal(await ui.getByRole("button", { name: "确认删除类型", exact: true }).isDisabled(), true);
+  assert.match(await ui.locator("#migration-impact").innerText(), /1 个归档/);
+  const deletionCode = await page.evaluate(async (id) => {
+    const state = await window.buddePrototype.client.snapshot();
+    try { await window.buddePrototype.client.execute({ kind: "type.delete", id, expectedRevision: state.revision }); }
+    catch (error) { return error.code; }
+  }, first.id);
+  assert.equal(deletionCode, "IN_USE");
+  await selectType("software");
+  const before = await snapshot(page);
+  await stage("software-2").getByRole("button", { name: "删除", exact: true }).click();
+  assert.match(await ui.locator("#migration-impact").innerText(), /2 个事项.*1 个归档/);
+  await click("确认删除并迁移");
+  assert.equal((await snapshot(page)).revision, before.revision);
+  assert.ok(await ui.locator("#settings-error").innerText());
+  await field("迁移目标阶段").selectOption("software-1");
+  await page.screenshot({ path: `${output}/settings-migration.png` });
+  await click("确认删除并迁移");
+  let after = await snapshot(page);
+  for (const item of before.items.filter((entry) => entry.typeId === "software" && entry.stageId === "software-2")) {
+    const next = after.items.find((entry) => entry.id === item.id);
+    assert.equal(next.stageId, "software-1"); assert.equal(next.version, item.version + 1);
+    assert.equal(next.archived, item.archived); assert.equal(next.paused, item.paused);
+  }
+  await stage("software-0").getByRole("button", { name: "删除", exact: true }).click();
+  assert.match(await ui.locator("#migration-impact").innerText(), /初始阶段/);
+  await field("迁移目标阶段").selectOption("software-1");
+  await click("确认删除并迁移");
+  after = await snapshot(page);
+  assert.equal(after.types.find((entry) => entry.id === "software").initialStageId, "software-1");
+  await page.screenshot({ path: `${output}/settings-lifecycle.png` });
+  await click("编辑类型");
+  await field("类型名称").fill("软件 · 最终设置");
+  await click("关闭设置");
+  await page.getByRole("button", { name: "保存后继续", exact: true }).click();
+  assert.equal(await ui.isVisible(), false);
+  assert.equal((await snapshot(page)).types.find((entry) => entry.id === "software").name, "软件 · 最终设置");
+  await page.getByLabel("新事项类型", { exact: true }).selectOption("software");
+  await capture(page, "使用新初始阶段");
+  assert.equal((await snapshot(page)).items[0].stageId, "software-1");
+  assert.equal((await snapshot(page)).items[0].promoted, false);
+  await page.locator("header .more summary").click();
+  const downloading = page.waitForEvent("download");
+  await page.getByRole("button", { name: "导出 JSON", exact: true }).click();
+  const download = await downloading;
+  const exported = JSON.parse(await (await import("node:fs/promises")).readFile(await download.path(), "utf8"));
+  assert.equal(exported.product, "Budde");
+  assert.equal(exported.noteContentsIncluded, false);
+  assert.deepEqual(exported.data, await snapshot(page));
+  assert.match(await page.locator("#notice").innerText(), /不包含.*正文/);
+};
+
 const chosen = process.argv.find((arg) => arg.startsWith("--group="))?.slice(8);
 if (chosen && !groups[chosen]) throw new Error(`Unknown group: ${chosen}`);
 const output = await buildPrototype();
