@@ -127,5 +127,49 @@ h1 { font-size: 20px; line-height: 1.4; margin: 0; font-weight: 600; }
   .board-hint { margin-left: 0; }
   .row { padding: 12px 6px; gap: 8px; }
   .demo-footer { padding: 8px 16px; }
-  .demo-footer > span:last-child { display: none; }
 }
+/* On-demand detail: a rail only when the host container has room. */
+#detail-host { width: 320px; flex-shrink: 0; min-height: 0; border-left: 1px solid var(--b3-border-color); }
+.detail-pane { height: 100%; overflow: auto; padding: 0 0 20px 22px; overscroll-behavior: contain; }
+.detail-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0 20px; color: var(--b3-theme-on-surface); font-size: 12px; }
+.icon-button { min-height: 32px; min-width: 32px; padding: 2px 7px; border-color: transparent; background: transparent; font-size: 18px; }
+fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+#detail-form label { display: block; font-size: 12px; color: var(--b3-theme-on-surface); margin: 0 0 8px; }
+#detail-form input, #detail-form textarea, #detail-form select { width: 100%; }
+#detail-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; }
+.detail-selects { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+#detail-next, #detail-description { margin-bottom: 24px; }
+.notes-section h2 { font-size: 12px; font-weight: 400; color: var(--b3-theme-on-surface); margin: 0 0 8px; }
+#note-links { padding: 0; margin: 0 0 8px; list-style: none; }
+#note-links li { display: flex; align-items: center; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--b3-border-color); font-size: 12px; }
+.note-title { flex: 1; border: 0; background: transparent; text-align: left; font-size: 12px; padding: 0; overflow-wrap: anywhere; }
+.link-add-row { display: flex; gap: 8px; margin-top: 8px; }
+.link-add-row select { flex: 1; }
+.link-add-row button { flex-shrink: 0; }
+#link-editor { margin: 12px 0; }
+.save-row { margin-top: 24px; display: flex; align-items: center; gap: 12px; }
+.field-help { font-size: 12px; line-height: 1.7; color: var(--b3-theme-on-surface); overflow-wrap: anywhere; }
+#detail-error, #detail-message { margin-top: 12px; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+#detail-error { color: var(--budde-danger); }
+.reload-button { margin-top: 12px; font-size: 12px; }
+.detail-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--b3-border-color); }
+.detail-actions button { padding: 6px 10px; font-size: 12px; }
+.context-note { font-size: 12px; line-height: 1.7; padding: 8px 10px; background: var(--b3-theme-surface); border-left: 2px solid var(--b3-theme-primary); }
+.muted { color: var(--b3-theme-on-surface); }
+#detail-host.is-overlay { position: absolute; inset: 0; width: auto; z-index: 5; border: 0; background: color-mix(in srgb, var(--b3-theme-on-background) 18%, transparent); }
+#detail-host.is-overlay .detail-pane { margin-left: auto; width: 360px; max-width: 100%; padding: 16px 20px; background: var(--b3-theme-background); border-left: 1px solid var(--b3-border-color); }
+.guard-dialog { width: min(460px, calc(100vw - 32px)); padding: 24px; border: 1px solid var(--b3-border-color); border-radius: 6px; background: var(--b3-theme-background); color: var(--b3-theme-on-background); }
+.guard-dialog::backdrop, #settings-dialog::backdrop { background: color-mix(in srgb, var(--b3-theme-on-background) 20%, transparent); }
+.guard-dialog h2 { font-size: 18px; margin: 0 0 14px; }
+.guard-dialog p { line-height: 1.8; color: var(--b3-theme-on-surface); }
+.guard-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.card { position: relative; }
+.card .item-title { padding-right: 20px; }
+.card-menu { position: absolute; right: 5px; top: 8px; }
+.card-menu summary { border: 0; background: transparent; min-height: 32px; width: 32px; padding: 2px; font-size: 18px; list-style: none; text-align: center; }
+.card-menu .menu { min-width: 150px; }
+.demo-footer #demo-tools summary { min-height: 28px; padding: 2px 8px; border-color: transparent; font-size: 12px; }
+.demo-menu { bottom: calc(100% + 8px); top: auto; min-width: 220px; }
+.demo-menu p { font-size: 12px; padding: 0 8px; }
+.demo-menu button { font-size: 12px; }
+@container budde (max-width: 719px) { #detail-host.is-overlay .detail-pane { width: 100%; border-left: 0; } }

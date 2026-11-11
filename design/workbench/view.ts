@@ -18,6 +18,7 @@ function itemMarkup(state: BuddeState, item: Item, selected: string, board: bool
       ${item.nextStep ? `<p class="next-step" title="${escape(item.nextStep)}">${escape(item.nextStep)}</p>` : !board ? '<p class="next-step placeholder">下一步留白也没关系</p>' : ""}
       ${item.links.length ? `<span class="link-count">↗ ${item.links.length} 条笔记关联</span>` : ""}
     </div>
+    ${board ? `<details class="card-menu"><summary aria-label="更改阶段：${escape(item.title)}">···</summary><div class="menu">${type.stages.map((entry) => `<button data-stage-item="${escape(item.id)}" data-stage-target="${escape(entry.id)}" ${entry.id === item.stageId ? "disabled" : ""}>移到${escape(entry.name)}</button>`).join("")}</div></details>` : ""}
     ${!item.promoted && !item.archived ? `<button class="quiet start-action" data-promote="${escape(item.id)}">开始推进</button>` : ""}
   </article>`;
 }

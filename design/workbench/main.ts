@@ -1,6 +1,8 @@
 import type { BuddeClient, BuddeState, ItemPatch } from "../../src/core/types";
 import { CaptureRequest, createDemoSession, selectItems, type DemoSession, type Filters, type View } from "./model";
 import { escape, renderItems, sprout } from "./view";
+import { mountDetail } from "./detail";
+import { choose } from "./dialog";
 
 declare global {
   interface Window { buddePrototype: { client: BuddeClient; refresh(): Promise<void>; reset(): Promise<BuddeState> } }
@@ -30,7 +32,7 @@ export function mountPrototype(root: HTMLElement, session: DemoSession): { refre
       <div class="collection-frame"><aside id="type-index" aria-label="看板类型"></aside><div id="collection" tabindex="-1" aria-label="事项列表"></div></div>
       <p id="board-hint" class="board-hint" hidden>拖动卡片改变阶段，也可以在详情中选择。不同类型保留各自的生命周期。</p>
     </section><div id="detail-host"></div></main>
-    <footer class="demo-footer"><span>独立交互原型 · 示例数据，刷新重置</span><span>不连接真实思源数据</span></footer>
+    <footer class="demo-footer"><span>独立交互原型 · 示例数据，刷新重置</span><details id="demo-tools" class="more"><summary>演示工具</summary><div class="menu demo-menu"><p>以下仅用于演示与验证</p><button data-demo-fault="reject-next">下次保存失败</button><button data-demo-fault="lose-response">下次响应丢失</button><button data-demo="external" disabled>模拟外部修改</button><button data-demo="reset">重置示例数据</button></div></details></footer>
     <div id="modal-host"></div><dialog id="settings-dialog" aria-label="管理类型与阶段"></dialog>
   </div>`;
   const $ = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
@@ -39,6 +41,11 @@ export function mountPrototype(root: HTMLElement, session: DemoSession): { refre
   const search = $<HTMLInputElement>("#title-search");
   const filterType = $<HTMLSelectElement>("#filter-type");
   const collection = $("#collection");
+  const detail = mountDetail($("#detail-host"), {
+    client: session.client, notes: session.notes,
+    onSaved(next) { state = next; render(); },
+    onClosed() { selected = ""; render(); },
+  });
   const listen = (name: string, listener: EventListener) => root.addEventListener(name, listener, { signal: events.signal });
   function notify(message: string, error = false): void {
     $("#error").hidden = !error;
@@ -71,14 +78,19 @@ export function mountPrototype(root: HTMLElement, session: DemoSession): { refre
     collection.innerHTML = renderItems(state, view, currentFilters, selected);
     collection.scrollTop = position.top;
     collection.scrollLeft = position.left;
+    detail.refresh(state);
+    const hiddenNote = root.querySelector<HTMLElement>("#selected-hidden");
+    if (hiddenNote) hiddenNote.hidden = selectItems(state, view, currentFilters).some((item) => item.id === selected);
+    $<HTMLButtonElement>('[data-demo="external"]').disabled = !selected;
   }
   async function refresh(): Promise<void> { state = await session.client.snapshot(); render(); }
   async function mutate(id: string, patch: ItemPatch): Promise<void> {
+    if (id === selected) { await detail.apply(patch, patch.stageId ? "改变阶段" : "开始推进"); return; }
     const item = state.items.find((entry) => entry.id === id);
     if (!item) return;
     try {
       state = (await session.client.execute({ kind: "item.update", id, expectedVersion: item.version, patch })).state;
-      notify("已开始推进，原阶段保持不变。");
+      notify(patch.stageId ? "阶段已更新。" : "已开始推进，原阶段保持不变。");
       render();
     } catch (error) { notify(error instanceof Error ? error.message : String(error), true); }
   }
@@ -115,17 +127,48 @@ export function mountPrototype(root: HTMLElement, session: DemoSession): { refre
     if (event.target === filterType) { filters.typeId = filterType.value; render(); }
   }) as EventListener);
   listen("click", ((event: MouseEvent) => {
+    const target = event.target as Element;
+    root.querySelectorAll<HTMLDetailsElement>(".more[open],.card-menu[open]").forEach((menu) => {
+      if (!menu.contains(target) || target.closest("button")) menu.open = false;
+    });
     const button = (event.target as Element).closest<HTMLElement>("button");
     if (!button || !root.contains(button)) return;
-    if (button.dataset.view) { view = button.dataset.view as View; selected = ""; render(); }
-    if (button.dataset.boardType) { boardType = button.dataset.boardType; selected = ""; render(); }
+    if (button.dataset.view && button.dataset.view !== view) void (async () => {
+      if (await detail.requestClose()) { view = button.dataset.view as View; render(); }
+    })();
+    if (button.dataset.boardType && button.dataset.boardType !== boardType) void (async () => {
+      if (await detail.requestClose()) { boardType = button.dataset.boardType!; render(); }
+    })();
     if (button.dataset.pool) { filters.unpromotedOnly = button.dataset.pool === "unpromoted"; render(); }
-    if (button.dataset.open) { selected = button.dataset.open; render(); }
+    if (button.dataset.open) void (async () => {
+      const item = state.items.find((entry) => entry.id === button.dataset.open);
+      if (item && await detail.open(item)) { selected = item.id; render(); }
+    })();
+    if (button.dataset.stageItem && button.dataset.stageTarget) void mutate(button.dataset.stageItem, { stageId: button.dataset.stageTarget });
+    if (button.dataset.demoFault) { session.armFault(button.dataset.demoFault as "reject-next" | "lose-response"); notify("已启用一次模拟故障，仅影响下一次修改操作。"); }
+    if (button.dataset.demo === "external" && selected) void session.simulateExternalChange(selected).then(refresh).catch((error: Error) => notify(error.message, true));
+    if (button.dataset.demo === "reset") void (async () => {
+      const answer = await choose("重置全部示例数据？", "所有演示修改都会丢失，重新载入最初的合成事项。不会影响真实思源。", [{ value: "reset", label: "重置示例" }, { value: "cancel", label: "取消" }], "cancel");
+      if (answer === "reset" && await detail.requestClose()) { await session.reset(); request.success(); captureInput.value = ""; await refresh(); notify("示例数据已重置。"); }
+    })();
     if (button.dataset.promote) void mutate(button.dataset.promote, { promoted: true });
     if (button.dataset.action === "focus-capture") captureInput.focus();
     if (button.dataset.action === "clear-filters") { filters.query = ""; filters.typeId = ""; filters.unpromotedOnly = false; render(); search.focus(); }
   }) as EventListener);
-  return { refresh, destroy() { events.abort(); root.replaceChildren(); } };
+  listen("dragstart", ((event: DragEvent) => {
+    const item = (event.target as Element).closest<HTMLElement>("[data-item-id][draggable]");
+    if (item && event.dataTransfer) { event.dataTransfer.setData("text/budde-item", item.dataset.itemId!); event.dataTransfer.effectAllowed = "move"; }
+  }) as EventListener);
+  listen("dragover", ((event: DragEvent) => { if ((event.target as Element).closest("[data-stage-id]")) event.preventDefault(); }) as EventListener);
+  listen("drop", ((event: DragEvent) => {
+    const stage = (event.target as Element).closest<HTMLElement>("[data-stage-id]");
+    const id = event.dataTransfer?.getData("text/budde-item");
+    const item = state.items.find((entry) => entry.id === id);
+    if (!stage || !item || item.typeId !== boardType || item.archived || !item.promoted) return;
+    event.preventDefault();
+    if (item.stageId !== stage.dataset.stageId) void mutate(item.id, { stageId: stage.dataset.stageId });
+  }) as EventListener);
+  return { refresh, destroy() { detail.destroy(); events.abort(); root.replaceChildren(); } };
 }
 
 const session = createDemoSession();
