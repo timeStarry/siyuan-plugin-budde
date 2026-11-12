@@ -8,7 +8,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTML
 Textarea.displayName = "Textarea";
 /** shadcn Native Select adaptation: native keyboard semantics and existing change
  * delegation remain intact. It never portals into the host document. */
-export const NativeSelect = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(({ className, ...props }, ref) => <select ref={ref} className={cn(field, "bd-h-9 bd-py-0 bd-pr-3", className)} {...props} />);
+export const NativeSelect = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(({ className, ...props }, ref) => <select ref={ref} className={cn(field, "bd-h-9 bd-appearance-none bd-py-0 bd-pr-7", className)} {...props} />);
 NativeSelect.displayName = "NativeSelect";
 export const Select = NativeSelect;
 export function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) { return <label className={cn("bd-block bd-text-control bd-font-medium bd-text-foreground", className)} {...props} />; }

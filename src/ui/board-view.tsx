@@ -409,7 +409,7 @@ function StageColumn({
       data-stage-id={stage.id}
       aria-label={stage.name}
       className={cn(
-        "stage-column bd-group bd-flex bd-h-full bd-w-68 bd-min-w-[260px] bd-max-w-[300px] bd-shrink-0 bd-flex-col bd-rounded-lg bd-border bd-bg-muted/65 bd-transition-colors",
+        "stage-column bd-group bd-flex bd-h-full bd-w-64 bd-min-w-[256px] bd-shrink-0 bd-flex-col bd-rounded-lg bd-border bd-bg-muted/65 bd-transition-colors",
         isOver ? "bd-border-foreground/35 bd-bg-muted" : "bd-border-border/70",
       )}
     >
@@ -687,7 +687,10 @@ function GhostColumn({
     <section
       data-ghost-column
       aria-label="新增阶段"
-      className="bd-w-60 bd-min-w-[230px] bd-shrink-0 bd-self-start bd-rounded-lg bd-border bd-border-dashed bd-border-border bd-bg-background/50 bd-p-3"
+      className={cn(
+        "bd-shrink-0 bd-self-start bd-rounded-lg bd-border bd-border-dashed bd-border-border bd-bg-background/50",
+        open ? "bd-w-64 bd-min-w-[256px] bd-p-3" : "bd-w-36 bd-min-w-[144px] bd-p-1.5",
+      )}
     >
       {open ? (
         <form

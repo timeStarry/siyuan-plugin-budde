@@ -237,7 +237,7 @@ function DetailContent({
 
   return (
     <>
-      <div className="detail-heading bd-flex bd-min-h-13 bd-shrink-0 bd-items-center bd-justify-between bd-gap-2 bd-border-b bd-border-border bd-px-4 bd-py-2.5">
+      <div className="detail-heading bd-flex bd-min-h-[52px] bd-shrink-0 bd-items-center bd-justify-between bd-gap-2 bd-border-b bd-border-border bd-px-4 bd-py-2.5">
         <div className="bd-flex bd-min-w-0 bd-items-center bd-gap-2">
           <Badge variant={statusInfo.tone}>{statusInfo.label}</Badge>
           {review && (

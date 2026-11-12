@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
 import type { BuddeState, Item } from "../core/types";
 import {
   CaptureRequest,
@@ -31,8 +30,7 @@ import { cn } from "./lib/utils";
 export function WorkbenchApp() {
   const { state, loading, fatalError, execute, confirm, refresh, exportJson, importJson } =
     useBudde();
-  const { root, instanceId } = usePane();
-  const reduced = useReducedMotion();
+  const { root } = usePane();
 
   const [view, setView] = useState<ViewMode>("pool");
   const [boardTypeId, setBoardTypeId] = useState<string>("general");
@@ -277,7 +275,7 @@ export function WorkbenchApp() {
     >
       <header
         data-budde-shell="header"
-        className="app-header bd-flex bd-min-h-13 bd-shrink-0 bd-items-center bd-gap-4 bd-border-b bd-border-border bd-bg-card bd-px-4 bd-py-2 [@container(max-width:640px)]:bd-flex-wrap [@container(max-width:640px)]:bd-gap-2 [@container(max-width:640px)]:bd-px-3"
+        className="app-header bd-flex bd-min-h-[52px] bd-shrink-0 bd-items-center bd-gap-4 bd-border-b bd-border-border bd-bg-card bd-px-4 bd-py-2 [@container(max-width:640px)]:bd-flex-wrap [@container(max-width:640px)]:bd-gap-2 [@container(max-width:640px)]:bd-px-3"
       >
         <div className="brand bd-flex bd-shrink-0 bd-items-center bd-gap-2 bd-pr-2">
           <Icon name="brand" />
@@ -303,15 +301,8 @@ export function WorkbenchApp() {
                 data-view={nav.id}
                 aria-pressed={active}
                 onClick={() => handleSwitchView(nav.id)}
-                className="bd-relative bd-isolate aria-pressed:bd-bg-transparent"
+                className="bd-border bd-border-transparent aria-pressed:bd-border-border aria-pressed:bd-bg-muted aria-pressed:bd-shadow-xs"
               >
-                {active && (
-                  <motion.span
-                    layoutId={`${instanceId}-main-nav`}
-                    transition={{ duration: reduced ? 0 : 0.16, ease: [0.22, 1, 0.36, 1] }}
-                    className="bd-pointer-events-none bd-absolute bd-inset-0 -bd-z-10 bd-rounded-md bd-border bd-border-border bd-bg-muted bd-shadow-xs"
-                  />
-                )}
                 <Icon name={nav.icon} />
                 <span>{nav.label}</span>
                 {nav.count !== undefined && (
@@ -841,8 +832,8 @@ function FilterToolbar({
   showReviewSort?: boolean;
 }) {
   return (
-    <div className="bd-flex bd-flex-wrap bd-items-center bd-gap-2">
-      <div className="bd-relative bd-flex bd-w-48 bd-max-w-full bd-items-center">
+    <div className="bd-flex bd-flex-wrap bd-items-center bd-gap-2 [@container(max-width:520px)]:bd-w-full">
+      <div className="bd-relative bd-flex bd-w-48 bd-max-w-full bd-items-center [@container(max-width:520px)]:bd-w-full">
         <span className="bd-pointer-events-none bd-absolute bd-left-2.5 bd-text-muted-foreground">
           <Icon name="search" />
         </span>
@@ -860,7 +851,7 @@ function FilterToolbar({
         aria-label="按类型筛选"
         value={filters.typeId}
         onChange={(e) => onFiltersChange({ typeId: e.target.value })}
-        className="bd-h-8 bd-w-28 bd-text-xs"
+        className="bd-h-8 bd-w-28 bd-text-xs [@container(max-width:520px)]:bd-flex-1"
       >
         <option value="">所有类型</option>
         {state.types.map((t) => (
@@ -874,7 +865,7 @@ function FilterToolbar({
         aria-label="排序方式"
         value={filters.sort}
         onChange={(e) => onFiltersChange({ sort: e.target.value as SortMode })}
-        className="bd-h-8 bd-w-28 bd-text-xs"
+        className="bd-h-8 bd-w-32 bd-text-xs [@container(max-width:520px)]:bd-flex-1"
       >
         <option value="manual">置顶与默认</option>
         <option value="updated">最近更新</option>

@@ -293,7 +293,7 @@ export function BuddeProvider({
         <div
           aria-live="polite"
           aria-atomic="false"
-          className="bd-pointer-events-none bd-absolute bd-bottom-4 bd-left-1/2 bd-z-50 bd-flex bd-w-full bd-max-w-md -bd-translate-x-1/2 bd-flex-col bd-items-center bd-gap-2 bd-px-4"
+          className="bd-pointer-events-none bd-absolute bd-bottom-5 bd-left-5 bd-z-50 bd-flex bd-max-w-sm bd-flex-col bd-items-start bd-gap-2 [@container(max-width:640px)]:bd-bottom-16 [@container(max-width:640px)]:bd-left-3 [@container(max-width:640px)]:bd-right-3 [@container(max-width:640px)]:bd-max-w-none"
         >
           {toasts.map((item) => (
             <div
