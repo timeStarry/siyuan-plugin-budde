@@ -121,7 +121,11 @@ export function SettingsModal({
       <div className="bd-grid bd-min-h-0 bd-flex-1 bd-grid-cols-[188px_minmax(0,1fr)] bd-overflow-hidden [@container(max-width:640px)]:bd-grid-cols-1">
         <aside className="bd-flex bd-flex-col bd-gap-1 bd-overflow-y-auto bd-border-r bd-border-border bd-bg-muted/45 bd-p-3 [@container(max-width:640px)]:bd-flex-row [@container(max-width:640px)]:bd-overflow-x-auto [@container(max-width:640px)]:bd-border-b [@container(max-width:640px)]:bd-border-r-0">
           {state.types.map((entry, idx) => (
-            <div key={entry.id} className="bd-group bd-flex bd-items-center bd-gap-0.5 [@container(max-width:640px)]:bd-shrink-0">
+            <div
+              key={entry.id}
+              data-settings-type-row={entry.id}
+              className="bd-group bd-relative bd-flex bd-h-8 bd-shrink-0 bd-items-center"
+            >
               <Button
                 size="sm"
                 variant="ghost"
@@ -133,18 +137,22 @@ export function SettingsModal({
                   setDeletingStageId(null);
                   setConfirmingDeleteType(false);
                 }}
-                className="bd-min-w-0 bd-flex-1 bd-justify-start bd-px-2"
+                className="bd-w-full bd-min-w-0 bd-justify-start bd-px-2 group-hover:bd-bg-muted group-hover:bd-pr-12 group-hover:bd-text-foreground aria-pressed:group-hover:bd-bg-accent [@container(max-width:640px)]:bd-w-auto [@container(max-width:640px)]:group-hover:bd-pr-2"
               >
                 <TypeIcon type={entry} />
-                <span className="bd-min-w-0 bd-flex-1 bd-truncate bd-text-left">
+                <span className="bd-min-w-0 bd-flex-1 bd-truncate bd-text-left" title={entry.name}>
                   {entry.name}
                 </span>
               </Button>
-              <div className="bd-hidden bd-flex-col group-hover:bd-flex [@container(max-width:640px)]:bd-hidden">
+              <div
+                data-settings-type-actions
+                className="bd-pointer-events-none bd-absolute bd-inset-y-0 bd-right-1 bd-flex bd-items-center bd-gap-0.5 bd-opacity-0 bd-transition-opacity group-hover:bd-pointer-events-auto group-hover:bd-opacity-100 group-focus-within:bd-pointer-events-auto group-focus-within:bd-opacity-100 [@media(hover:none)]:bd-pointer-events-auto [@media(hover:none)]:bd-opacity-100 [@container(max-width:640px)]:bd-hidden"
+              >
                 <button
                   type="button"
                   disabled={idx === 0}
                   aria-label={`上移类型：${entry.name}`}
+                  title="上移"
                   onClick={() => {
                     const ids = state.types.map((t) => t.id);
                     [ids[idx], ids[idx - 1]] = [ids[idx - 1], ids[idx]];
@@ -154,7 +162,7 @@ export function SettingsModal({
                       expectedRevision: state.revision,
                     });
                   }}
-                  className="bd-p-0.5 bd-text-muted-foreground hover:bd-text-foreground disabled:bd-opacity-30"
+                  className="bd-inline-flex bd-h-6 bd-w-5 bd-items-center bd-justify-center bd-rounded bd-text-muted-foreground bd-transition-colors hover:bd-bg-background/80 hover:bd-text-foreground disabled:bd-pointer-events-none disabled:bd-opacity-30"
                 >
                   <Icon name="up" />
                 </button>
@@ -162,6 +170,7 @@ export function SettingsModal({
                   type="button"
                   disabled={idx === state.types.length - 1}
                   aria-label={`下移类型：${entry.name}`}
+                  title="下移"
                   onClick={() => {
                     const ids = state.types.map((t) => t.id);
                     [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
@@ -171,7 +180,7 @@ export function SettingsModal({
                       expectedRevision: state.revision,
                     });
                   }}
-                  className="bd-p-0.5 bd-text-muted-foreground hover:bd-text-foreground disabled:bd-opacity-30"
+                  className="bd-inline-flex bd-h-6 bd-w-5 bd-items-center bd-justify-center bd-rounded bd-text-muted-foreground bd-transition-colors hover:bd-bg-background/80 hover:bd-text-foreground disabled:bd-pointer-events-none disabled:bd-opacity-30"
                 >
                   <Icon name="down" />
                 </button>

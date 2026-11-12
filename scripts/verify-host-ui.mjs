@@ -229,6 +229,33 @@ try {
   const settingsModal = page.locator('[data-budde-modal="true"]');
   await expect(settingsModal).toBeVisible();
   await expect(settingsModal.locator("h2.bd-text-base")).toHaveText("管理类型与阶段");
+
+  // Verify hovering a sidebar type row never changes its height, pill width, or sibling Y position
+  const measureSidebarRows = () =>
+    settingsModal.evaluate((modal) => {
+      const rows = Array.from(modal.querySelectorAll("[data-settings-type-row]"));
+      const target = rows[1];
+      const next = rows[2];
+      const btn = target.querySelector("button");
+      const tr = target.getBoundingClientRect();
+      const nr = next.getBoundingClientRect();
+      const br = btn.getBoundingClientRect();
+      return {
+        rowHeight: tr.height,
+        buttonWidth: br.width,
+        nextTop: nr.top,
+      };
+    });
+  const beforeHover = await measureSidebarRows();
+  const secondTypeRow = settingsModal.locator("[data-settings-type-row]").nth(1);
+  await secondTypeRow.hover();
+  await expect(secondTypeRow.locator("[data-settings-type-actions]")).toHaveCSS("opacity", "1");
+  const duringHover = await measureSidebarRows();
+  expect(beforeHover.rowHeight).toBe(32);
+  expect(duringHover.rowHeight).toBe(beforeHover.rowHeight);
+  expect(duringHover.buttonWidth).toBe(beforeHover.buttonWidth);
+  expect(duringHover.nextTop).toBe(beforeHover.nextTop);
+
   await settingsModal.getByRole("button", { name: "更换图标与配色" }).click();
   const iconSearch = settingsModal.getByRole("searchbox", { name: "搜索图标" });
   await expect(iconSearch).toBeVisible();

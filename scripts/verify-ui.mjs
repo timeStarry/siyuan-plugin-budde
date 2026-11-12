@@ -176,7 +176,7 @@ try {
   await settingsModal.locator('[data-icon-option="FlaskConical"]').click();
   await settingsModal.getByRole("button", { name: "配色：青绿" }).click();
   await settingsModal.getByRole("button", { name: "创建类型" }).click();
-  await expect(settingsModal.getByRole("button", { name: "专题研究" })).toBeVisible();
+  await expect(settingsModal.getByRole("button", { name: "专题研究", exact: true })).toBeVisible();
 
   await page.screenshot({ path: `${qaDir}/settings-modal-1440.png`, animations: "disabled" });
   await settingsModal.getByRole("button", { name: "关闭设置" }).click();
