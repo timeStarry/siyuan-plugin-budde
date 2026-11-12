@@ -21,10 +21,13 @@ test("brand renders the original shared sprout, not the generic Lucide sprout, w
   assert.equal(brand.match(/ d="([^"]+)"/)?.[1], BUDDE_ICON_SYMBOL.match(/ d="([^"]+)"/)?.[1], "workbench and host must render the same path");
   assert.match(BUDDE_ICON_SYMBOL, /id="iconBudde"/);
   assert.match(BUDDE_ICON_SYMBOL, /stroke="currentColor"/);
+  assert.match(BUDDE_ICON_SYMBOL, /fill:none!important/);
+  assert.match(brand, /style="fill:none;stroke:currentColor"/);
   const ordinary = renderToStaticMarkup(createElement(Icon, { name: "pool" }));
   assert.match(ordinary, /lucide-inbox/);
   assert.match(ordinary, /width="16"/);
   assert.match(ordinary, /stroke-width="1.5"/);
+  assert.match(ordinary, /style="fill:none;stroke:currentColor"/);
   assert.match(brand, /stroke-width="1.75"/);
 });
 

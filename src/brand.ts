@@ -6,4 +6,4 @@ export const BUDDE_MARK = {
   strokeWidth: 1.75,
 } as const;
 
-export const BUDDE_ICON_SYMBOL = `<symbol id="iconBudde" viewBox="${BUDDE_MARK.viewBox}"><path fill="none" stroke="currentColor" stroke-width="${BUDDE_MARK.strokeWidth}" stroke-linecap="round" stroke-linejoin="round" d="${BUDDE_MARK.path}"/></symbol>`;
+export const BUDDE_ICON_SYMBOL = `<symbol id="iconBudde" viewBox="${BUDDE_MARK.viewBox}" fill="none" stroke="currentColor" stroke-width="${BUDDE_MARK.strokeWidth}" stroke-linecap="round" stroke-linejoin="round" style="fill:none!important;stroke:currentColor!important"><path fill="none" stroke="currentColor" stroke-width="${BUDDE_MARK.strokeWidth}" stroke-linecap="round" stroke-linejoin="round" style="fill:none!important;stroke:currentColor!important" d="${BUDDE_MARK.path}"/></symbol>`;

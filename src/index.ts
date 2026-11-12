@@ -65,6 +65,11 @@ export default class BuddePlugin extends Plugin {
   };
 
   onload(): void {
+    if (typeof document !== "undefined") {
+      document
+        .querySelectorAll?.('svg[data-name="siyuan-plugin-budde"] symbol#iconBudde')
+        .forEach((node) => node.remove());
+    }
     this.addIcons(BUDDE_ICON_SYMBOL);
     try {
       const host = window as unknown as {

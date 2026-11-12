@@ -126,6 +126,7 @@ export function TypeIcon({
           strokeWidth={1.5}
           strokeLinecap="round"
           strokeLinejoin="round"
+          style={{ fill: "none", stroke: "currentColor" }}
           focusable="false"
         />
       ) : (

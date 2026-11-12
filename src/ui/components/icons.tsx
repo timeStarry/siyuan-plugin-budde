@@ -82,6 +82,8 @@ const icons = {
 
 export type IconName = "brand" | keyof typeof icons;
 
+const OUTLINE_SVG_STYLE = { fill: "none", stroke: "currentColor" } as const;
+
 export function Icon({ name, className = "" }: { name: IconName; className?: string }) {
   if (name === "brand") {
     return (
@@ -95,11 +97,12 @@ export function Icon({ name, className = "" }: { name: IconName; className?: str
         strokeWidth={BUDDE_MARK.strokeWidth}
         strokeLinecap="round"
         strokeLinejoin="round"
+        style={OUTLINE_SVG_STYLE}
         aria-hidden="true"
         focusable="false"
         className={`bd-shrink-0 ${className}`.trim()}
       >
-        <path d={BUDDE_MARK.path} />
+        <path d={BUDDE_MARK.path} fill="none" style={{ fill: "none" }} />
       </svg>
     );
   }
@@ -113,6 +116,7 @@ export function Icon({ name, className = "" }: { name: IconName; className?: str
       strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
+      style={OUTLINE_SVG_STYLE}
       aria-hidden="true"
       focusable="false"
       className={`bd-shrink-0 ${className}`.trim()}

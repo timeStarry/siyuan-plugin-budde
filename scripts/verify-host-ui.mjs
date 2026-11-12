@@ -15,10 +15,16 @@ try {
   await page.setViewportSize({ width: 1440, height: 900 });
 
   await page.evaluate(() => {
-    // SiYuan 3.8+ desktop global CSS overrides SVG fill="none" attributes unless isolated.
+    // Emulate SiYuan desktop global CSS PLUS high-specificity container/dialog/path theme selectors
+    // that previously defeated zero-specificity `.budde :where(svg) { fill: none }`.
+    document.body.classList.add("layout-tab-container");
     const style = document.createElement("style");
     style.id = "synthetic-siyuan-svg";
-    style.textContent = "svg { fill: currentColor; display: inline-block; }";
+    style.textContent = [
+      "svg { fill: currentColor; display: inline-block; }",
+      ".layout-tab-container svg, .b3-dialog svg, html[data-theme-mode] svg { fill: currentColor; }",
+      ".layout-tab-container svg path, .layout-tab-container svg circle, .layout-tab-container svg rect { fill: currentColor; }",
+    ].join("\n");
     document.head.prepend(style);
 
     const hostIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -63,6 +69,7 @@ try {
         constructor(options) {
           registrations.dialogs += 1;
           this.element = document.createElement("div");
+          this.element.className = "b3-dialog";
           this.element.dataset.syntheticDialog = "true";
           this.element.innerHTML = options.content;
           document.body.appendChild(this.element);
@@ -208,12 +215,24 @@ try {
   expect(hostMark.hostViewBox).toBe(hostMark.workbenchViewBox);
   expect(hostMark.topbarIcon).toBe("iconBudde");
 
-  // Verify Quick Capture Dialog via command[1] (⌥⇧N)
+  // Verify Quick Capture Dialog via command[1] (⌥⇧N), including SVG outline inside .b3-dialog
   await page.evaluate(() => {
     window.hostRegistrations.commands[1].callback();
   });
   const qcInput = page.locator('[data-part="quick-capture-input"]');
   await expect(qcInput).toBeVisible();
+  const qcFilledIcons = await page
+    .locator('[data-synthetic-dialog="true"] svg')
+    .evaluateAll((nodes) =>
+      nodes.filter(
+        (svg) =>
+          getComputedStyle(svg).fill !== "none" ||
+          [...svg.querySelectorAll("path,rect,circle,polygon,polyline,line,ellipse")].some(
+            (child) => getComputedStyle(child).fill !== "none",
+          ),
+      ).length,
+    );
+  expect(qcFilledIcons).toBe(0);
   await qcInput.fill("通过全局快捷弹窗捕获的想法");
   await qcInput.press("Enter");
   await expect(page.locator('[data-synthetic-dialog="true"]')).toHaveCount(0);

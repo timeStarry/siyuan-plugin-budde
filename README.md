@@ -2,7 +2,7 @@
 
 思源里的轻量想法池与生命周期看板：**先记一个标题，想推进时再展开；用思源笔记承载长内容。**
 
-Budde 是运行在思源笔记桌面端的原生插件（当前版本 `0.2.0`），不需要独立账号、云服务或外部数据库进程，数据随当前思源工作空间安全存储。
+Budde 是运行在思源笔记桌面端的原生插件（当前版本 `0.2.1`），不需要独立账号、云服务或外部数据库进程，数据随当前思源工作空间安全存储。
 
 ## 核心工作流与功能
 
@@ -37,7 +37,7 @@ Budde 是运行在思源笔记桌面端的原生插件（当前版本 `0.2.0`）
 
 ## 安装与升级
 
-安装包 `siyuan-plugin-budde-0.2.0.zip` 根目录直接包含插件运行文件。退出思源（或关闭 Budde 页签并禁用插件）后，将压缩包解压至工作空间的 `data/plugins/siyuan-plugin-budde/`，保留 `data/storage/petal/siyuan-plugin-budde/` 数据目录不变，重启思源并启用插件即可（旧版 `schemaVersion: 1` 数据会在读取与写入时自动无损升级为 `schemaVersion: 2`）。
+安装包 `siyuan-plugin-budde-0.2.1.zip` 根目录直接包含插件运行文件。退出思源（或关闭 Budde 页签并禁用插件）后，将压缩包解压至工作空间的 `data/plugins/siyuan-plugin-budde/`，保留 `data/storage/petal/siyuan-plugin-budde/` 数据目录不变，重启思源并启用插件即可（旧版 `schemaVersion: 1` 数据会在读取与写入时自动无损升级为 `schemaVersion: 2`）。
 
 ## 开发与验证
 

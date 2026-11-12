@@ -55,9 +55,10 @@ const host = {
   },
 };
 
+const pkg = JSON.parse(await readFile(path.join(rootDir, "package.json"), "utf8"));
 const manifest = JSON.parse(await readFile(path.join(rootDir, "dist/plugin.json"), "utf8"));
 assert.equal(manifest.name, "siyuan-plugin-budde");
-assert.equal(manifest.version, "0.2.0");
+assert.equal(manifest.version, pkg.version);
 assert.equal(manifest.minAppVersion, "3.4.1");
 
 globalThis.window = {

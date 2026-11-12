@@ -76,11 +76,16 @@
 .budde :where(textarea) {
   resize: vertical;
 }
-/* SiYuan's global svg { fill: currentColor } overrides SVG presentation attributes. */
-.budde :where(svg) {
+/* SiYuan's global and container svg/path rules override SVG presentation attributes.
+ * Enforce stroke-only outline rendering across all Budde SVG elements and shapes. */
+.budde svg {
   display: block;
   vertical-align: middle;
-  fill: none;
+  fill: none !important;
+  stroke: currentColor;
+}
+.budde svg :is(path, rect, circle, polygon, polyline, line, ellipse) {
+  fill: none !important;
 }
 .budde [hidden] {
   display: none !important;
