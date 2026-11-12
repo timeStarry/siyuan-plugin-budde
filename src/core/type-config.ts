@@ -1,6 +1,7 @@
 /** Offline presentation vocabulary; pure data, independent of UI and SiYuan. */
 export const TYPE_ICONS = [
   { name: "Shapes", label: "通用", keywords: "形状 分类 类型" },
+  { name: "Lightbulb", label: "灵感", keywords: "想法 创意 点子 通用" },
   { name: "FileText", label: "文档", keywords: "文章 文件 文字" },
   { name: "NotebookPen", label: "笔记", keywords: "记录 日记 手帐" },
   { name: "BookOpen", label: "阅读", keywords: "书籍 学习 资料" },
@@ -9,7 +10,6 @@ export const TYPE_ICONS = [
   { name: "Terminal", label: "终端", keywords: "命令 脚本 开发" },
   { name: "Bug", label: "问题", keywords: "缺陷 调试 软件" },
   { name: "Wrench", label: "工具", keywords: "维修 构建 设置" },
-  { name: "Lightbulb", label: "灵感", keywords: "想法 创意 点子" },
   { name: "FlaskConical", label: "实验", keywords: "研究 科学 验证" },
   { name: "Rocket", label: "发布", keywords: "火箭 项目 启动" },
   { name: "Target", label: "目标", keywords: "计划 专注 任务" },
@@ -37,29 +37,98 @@ export const TYPE_ICONS = [
   { name: "Gamepad2", label: "游戏", keywords: "娱乐 兴趣 手柄" },
   { name: "Leaf", label: "成长", keywords: "叶子 自然 植物" },
 ] as const;
-export type TypeLucideIcon = typeof TYPE_ICONS[number]["name"];
-export const TYPE_COLORS = ["default", "blue", "emerald", "amber", "violet", "rose"] as const;
-export type TypeColor = typeof TYPE_COLORS[number];
 
-const iconNames = new Set<string>(TYPE_ICONS.map(icon => icon.name));
+export type TypeLucideIcon = (typeof TYPE_ICONS)[number]["name"];
+export const TYPE_COLORS = ["default", "blue", "emerald", "amber", "violet", "rose"] as const;
+export type TypeColor = (typeof TYPE_COLORS)[number];
+
+export const DEFAULT_REVIEW_DAYS = 14;
+export const REVIEW_DAY_PRESETS = [
+  { value: 7, label: "7 天" },
+  { value: 14, label: "14 天（默认）" },
+  { value: 30, label: "30 天" },
+  { value: 60, label: "60 天" },
+  { value: null, label: "关闭复查提醒" },
+] as const;
+
+const iconNames = new Set<string>(TYPE_ICONS.map((icon) => icon.name));
 const segmenter = new Intl.Segmenter("zh", { granularity: "grapheme" });
+
 export function isTypeIcon(value: unknown): value is string {
   if (typeof value !== "string" || !value || value.length > 64) return false;
   if (iconNames.has(value)) return true;
-  // One visible Emoji, including modifiers, ZWJ families, flags and keycaps;
-  // never treat a UTF-16 code unit or arbitrary single letter as an Emoji.
-  return [...segmenter.segment(value)].length === 1 &&
-    (/\p{Extended_Pictographic}/u.test(value) || /^\p{Regional_Indicator}{2}$/u.test(value) || /^[0-9#*]\uFE0F?\u20E3$/u.test(value));
+  return (
+    [...segmenter.segment(value)].length === 1 &&
+    (/\p{Extended_Pictographic}/u.test(value) ||
+      /^\p{Regional_Indicator}{2}$/u.test(value) ||
+      /^[0-9#*]\uFE0F?\u20E3$/u.test(value))
+  );
 }
+
 export function isTypeColor(value: unknown): value is TypeColor {
   return typeof value === "string" && (TYPE_COLORS as readonly string[]).includes(value);
 }
 
+export function isValidReviewDays(value: unknown): value is number | null {
+  if (value === null) return true;
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= 365;
+}
+
 export const STAGE_TEMPLATES = {
-  basic: { label: "基础 · 想法到完成", stages: [{ name: "想法", completed: false }, { name: "完成", completed: true }] },
-  article: { label: "文章 · 选题到发布", stages: [{ name: "选题", completed: false }, { name: "写作", completed: false }, { name: "修改", completed: false }, { name: "已发布", completed: true }] },
-  software: { label: "软件 · 想法到发布", stages: [{ name: "想法", completed: false }, { name: "验证", completed: false }, { name: "开发", completed: false }, { name: "已发布", completed: true }] },
-  travel: { label: "旅行 · 想去到结束", stages: [{ name: "想去", completed: false }, { name: "规划", completed: false }, { name: "已预订", completed: false }, { name: "已结束", completed: true }] },
-  blank: { label: "自行配置 · 仅一个起始阶段", stages: [{ name: "想法", completed: false }] },
+  basic: {
+    label: "基础 · 想法到完成",
+    defaultIcon: "Lightbulb",
+    defaultColor: "amber" as TypeColor,
+    defaultReviewDays: 14,
+    stages: [
+      { name: "想法", completed: false },
+      { name: "进行中", completed: false },
+      { name: "完成", completed: true },
+    ],
+  },
+  article: {
+    label: "文章 · 选题到发布",
+    defaultIcon: "PenLine",
+    defaultColor: "blue" as TypeColor,
+    defaultReviewDays: 14,
+    stages: [
+      { name: "选题", completed: false },
+      { name: "写作", completed: false },
+      { name: "修改", completed: false },
+      { name: "已发布", completed: true },
+    ],
+  },
+  software: {
+    label: "软件 · 想法到发布",
+    defaultIcon: "Code2",
+    defaultColor: "violet" as TypeColor,
+    defaultReviewDays: 7,
+    stages: [
+      { name: "想法", completed: false },
+      { name: "验证", completed: false },
+      { name: "开发", completed: false },
+      { name: "已发布", completed: true },
+    ],
+  },
+  travel: {
+    label: "旅行 · 想去到结束",
+    defaultIcon: "Compass",
+    defaultColor: "emerald" as TypeColor,
+    defaultReviewDays: 30,
+    stages: [
+      { name: "想去", completed: false },
+      { name: "规划", completed: false },
+      { name: "已预订", completed: false },
+      { name: "已结束", completed: true },
+    ],
+  },
+  blank: {
+    label: "极简 · 仅一个起始阶段",
+    defaultIcon: "Shapes",
+    defaultColor: "default" as TypeColor,
+    defaultReviewDays: 14,
+    stages: [{ name: "想法", completed: false }],
+  },
 } as const;
+
 export type StageTemplateId = keyof typeof STAGE_TEMPLATES;

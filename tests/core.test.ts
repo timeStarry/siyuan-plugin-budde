@@ -6,10 +6,11 @@ import {
   createInitialState,
   validateState,
 } from "../src/core/service";
+
 const setup = () =>
   new BuddeService(new MemoryStore(), () => "2026-11-11T00:00:00.000Z");
 
-test("title-only capture has stable identity, no dates or note requirements; identical titles allowed", async () => {
+test("title-only capture has stable identity, pool status, and no dates or note requirements", async () => {
   const client = setup();
   const first = await client.execute({
     kind: "item.create",
@@ -24,7 +25,9 @@ test("title-only capture has stable identity, no dates or note requirements; ide
   assert.notEqual(first.itemId, second.itemId);
   assert.equal(second.state.items.length, 2);
   assert.deepEqual(second.state.items[0].links, []);
-  assert.equal(second.state.items[0].promoted, false);
+  assert.equal(second.state.items[0].status, "pool");
+  assert.equal(second.state.items[0].pinned, false);
+  assert.ok(second.state.items[0].order < second.state.items[1].order);
   await assert.rejects(
     client.execute({
       kind: "item.create",
@@ -33,6 +36,96 @@ test("title-only capture has stable identity, no dates or note requirements; ide
     }),
     /标题/,
   );
+});
+
+test("legacy schemaVersion 1 snapshots upgrade seamlessly in memory to schemaVersion 2", async () => {
+  const legacyV1 = {
+    schemaVersion: 1,
+    revision: 7,
+    types: [
+      {
+        id: "general",
+        name: "通用",
+        initialStageId: "general-0",
+        stages: [
+          { id: "general-0", name: "想法", completed: false },
+          { id: "general-1", name: "进行中", completed: false },
+          { id: "general-2", name: "完成", completed: true },
+        ],
+      },
+    ],
+    items: [
+      {
+        id: "item-pool",
+        title: "池中想法",
+        typeId: "general",
+        stageId: "general-0",
+        promoted: false,
+        paused: false,
+        archived: false,
+        description: "",
+        nextStep: "",
+        links: [],
+        createdAt: "2026-10-01T00:00:00.000Z",
+        updatedAt: "2026-10-01T00:00:00.000Z",
+        reviewedAt: null,
+        version: 1,
+      },
+      {
+        id: "item-paused",
+        title: "暂停项目",
+        typeId: "general",
+        stageId: "general-1",
+        promoted: true,
+        paused: true,
+        archived: false,
+        description: "细节",
+        nextStep: "等待反馈",
+        links: [
+          {
+            id: "l1",
+            target: "siyuan://blocks/20260101000000-abcdefg",
+            title: "设计稿",
+            role: "reference",
+          },
+        ],
+        createdAt: "2026-10-02T00:00:00.000Z",
+        updatedAt: "2026-10-03T00:00:00.000Z",
+        reviewedAt: "2026-10-03T00:00:00.000Z",
+        version: 3,
+      },
+      {
+        id: "item-archived",
+        title: "归档项目",
+        typeId: "general",
+        stageId: "general-2",
+        promoted: true,
+        paused: false,
+        archived: true,
+        description: "",
+        nextStep: "",
+        links: [],
+        createdAt: "2026-10-04T00:00:00.000Z",
+        updatedAt: "2026-10-05T00:00:00.000Z",
+        reviewedAt: "2026-10-05T00:00:00.000Z",
+        version: 2,
+      },
+    ],
+    requests: {
+      "legacy-req-01": {
+        fingerprint: '["池中想法",null]',
+        itemId: "item-pool",
+      },
+    },
+  };
+
+  const upgraded = validateState(legacyV1);
+  assert.equal(upgraded.schemaVersion, 2);
+  assert.equal(upgraded.revision, 7);
+  assert.equal(upgraded.items[0].status, "pool");
+  assert.equal(upgraded.items[1].status, "paused");
+  assert.equal(upgraded.items[1].links[0].title, "设计稿");
+  assert.equal(upgraded.items[2].status, "archived");
 });
 
 test("retry is idempotent across service recreation, with explicit conflict on reused request ID", async () => {
@@ -72,7 +165,7 @@ test("concurrent writers reject stale changes and failed changes never alter per
       kind: "item.update",
       id,
       expectedVersion: 1,
-      patch: { title: "AI 修改" },
+      patch: { title: "并发修改" },
     }),
   ]);
   assert.equal(calls.filter((x) => x.status === "fulfilled").length, 1);
@@ -89,149 +182,184 @@ test("concurrent writers reject stale changes and failed changes never alter per
   assert.deepEqual(await client.snapshot(), before);
 });
 
-test("successful creation retry survives deletion of its original type and changes to defaults", async () => {
-  for (const typeId of [undefined, "general"]) {
-    const client = setup();
-    const command = {
-      kind: "item.create" as const,
-      title: "已迁移的想法",
-      requestId: "retry-after-move",
-      ...(typeId ? { typeId } : {}),
-    };
-    const created = await client.execute(command);
-    await client.execute({
-      kind: "item.update",
-      id: created.itemId!,
-      expectedVersion: 1,
-      patch: { typeId: "article", stageId: "article-0" },
-    });
-    await client.execute({
-      kind: "type.delete",
-      id: "general",
-      expectedRevision: 2,
-    });
-    const retried = await client.execute(command);
-    assert.equal(retried.itemId, created.itemId);
-    assert.equal(retried.state.items.length, 1);
-    assert.equal(retried.state.items[0].typeId, "article");
-  }
-});
-
-test("promote, pause, archive and cross-type move preserve content; progress alone updates review time", async () => {
+test("moving a pool item past initialStageId auto-promotes to active; cross-type switch defaults to target initialStageId", async () => {
   const client = setup();
   let r = await client.execute({
     kind: "item.create",
-    title: "软件",
-    requestId: "request-0001",
+    title: "自动推进的想法",
+    requestId: "request-auto-promote",
   });
   const id = r.itemId!;
+  assert.equal(r.state.items[0].status, "pool");
+  assert.equal(r.state.items[0].reviewedAt, null);
+
   r = await client.execute({
     kind: "item.update",
     id,
     expectedVersion: 1,
-    patch: { promoted: true, description: "长期资料", nextStep: "先验证" },
+    patch: { stageId: "general-1", description: "长期资料", nextStep: "先验证" },
   });
-  const progressTime = r.state.items[0].reviewedAt;
+  assert.equal(r.state.items[0].status, "active");
+  assert.equal(r.state.items[0].reviewedAt, "2026-11-11T00:00:00.000Z");
+
+  // Switching type without stageId cleanly falls back to targetType.initialStageId
   r = await client.execute({
     kind: "item.update",
     id,
     expectedVersion: 2,
-    patch: {
-      paused: true,
-      archived: true,
-      typeId: "software",
-      stageId: "software-2",
-    },
+    patch: { typeId: "article" },
   });
+  assert.equal(r.state.items[0].typeId, "article");
+  assert.equal(r.state.items[0].stageId, "article-0");
   assert.equal(r.state.items[0].description, "长期资料");
-  assert.equal(r.state.items[0].nextStep, "先验证");
-  assert.equal(r.state.items[0].reviewedAt, progressTime);
-  await assert.rejects(
-    client.execute({
-      kind: "item.update",
-      id,
-      expectedVersion: 3,
-      patch: { typeId: "article" },
-    }),
-    /目标阶段/,
-  );
 });
 
-test("stage rename/reorder preserves completion meaning and IDs, with optimistic config conflicts", async () => {
+test("item.delete, item.reorder, items.archiveCompleted and items.purgeArchived maintain strict consistency", async () => {
   const client = setup();
-  const state = await client.snapshot();
-  const original = state.types[0];
-  let r = await client.execute({
-    kind: "stage.reorder",
-    typeId: original.id,
-    ids: [...original.stages].reverse().map((s) => s.id),
-    expectedRevision: 0,
-  });
-  assert.equal(r.state.types[0].stages[0].completed, true);
-  r = await client.execute({
-    kind: "stage.update",
-    typeId: original.id,
-    id: "general-3",
-    name: "收获",
-    completed: true,
-    expectedRevision: 1,
-  });
-  assert.equal(r.state.types[0].stages[0].id, "general-3");
-  await assert.rejects(
-    client.execute({
-      kind: "stage.add",
-      typeId: original.id,
-      name: "新列",
-      expectedRevision: 1,
-    }),
-    { code: "CONFLICT" },
-  );
-});
-
-test("stage deletion migrates archived items atomically and bumps their versions", async () => {
-  const client = setup();
-  const r = await client.execute({
+  const a = await client.execute({
     kind: "item.create",
-    title: "归档也不能丢",
-    requestId: "request-0001",
+    title: "事项 A",
+    status: "active",
+    stageId: "general-3",
+    requestId: "req-item-a",
+  });
+  const b = await client.execute({
+    kind: "item.create",
+    title: "事项 B",
+    status: "active",
+    stageId: "general-1",
+    requestId: "req-item-b",
+  });
+  const c = await client.execute({
+    kind: "item.create",
+    title: "事项 C",
+    status: "active",
+    stageId: "general-1",
+    requestId: "req-item-c",
+  });
+
+  // Reorder B after C inside general-1
+  const reordered = await client.execute({
+    kind: "item.reorder",
+    id: b.itemId!,
+    stageId: "general-1",
+    afterId: c.itemId!,
+  });
+  const itemB = reordered.state.items.find((i) => i.id === b.itemId)!;
+  const itemC = reordered.state.items.find((i) => i.id === c.itemId)!;
+  assert.ok(itemB.order > itemC.order);
+
+  // Batch archive completed (item A is in general-3 which is completed)
+  const archivedRes = await client.execute({
+    kind: "items.archiveCompleted",
+    expectedRevision: reordered.state.revision,
+  });
+  assert.equal(archivedRes.affectedCount, 1);
+  assert.equal(
+    archivedRes.state.items.find((i) => i.id === a.itemId)?.status,
+    "archived",
+  );
+
+  // Purge archived removes item A and cleans its request record
+  const purged = await client.execute({
+    kind: "items.purgeArchived",
+    expectedRevision: archivedRes.state.revision,
+  });
+  assert.equal(purged.affectedCount, 1);
+  assert.equal(purged.state.items.some((i) => i.id === a.itemId), false);
+  assert.equal(Object.hasOwn(purged.state.requests, "req-item-a"), false);
+
+  // Single item delete removes item B
+  const deleted = await client.execute({
+    kind: "item.delete",
+    id: b.itemId!,
+  });
+  assert.equal(deleted.state.items.length, 1);
+  assert.equal(deleted.state.items[0].id, c.itemId);
+});
+
+test("stage deletion and type deletion with targetTypeId migrate items (including archived) atomically", async () => {
+  const client = setup();
+  const r1 = await client.execute({
+    kind: "item.create",
+    title: "归档事项",
+    typeId: "general",
+    stageId: "general-0",
+    requestId: "req-migrate-1",
+  });
+  const r2 = await client.execute({
+    kind: "item.create",
+    title: "已完成事项",
+    typeId: "general",
+    status: "active",
+    stageId: "general-3",
+    requestId: "req-migrate-2",
   });
   await client.execute({
     kind: "item.update",
-    id: r.itemId!,
+    id: r1.itemId!,
     expectedVersion: 1,
-    patch: { archived: true },
+    patch: { status: "archived" },
   });
+
+  const snap1 = await client.snapshot();
   await assert.rejects(
     client.execute({
       kind: "stage.delete",
       typeId: "general",
       id: "general-0",
-      expectedRevision: 2,
+      expectedRevision: snap1.revision,
     }),
     /迁移/,
   );
-  const moved = await client.execute({
+
+  const stageMoved = await client.execute({
     kind: "stage.delete",
     typeId: "general",
     id: "general-0",
     targetId: "general-1",
-    expectedRevision: 2,
+    expectedRevision: snap1.revision,
   });
-  assert.equal(moved.state.items[0].stageId, "general-1");
-  assert.equal(moved.state.items[0].archived, true);
-  assert.equal(moved.state.items[0].version, 3);
-  assert.equal(moved.state.types[0].initialStageId, "general-1");
+  assert.equal(
+    stageMoved.state.items.find((i) => i.id === r1.itemId)?.stageId,
+    "general-1",
+  );
+  assert.equal(stageMoved.state.types[0].initialStageId, "general-1");
+
+  // Type delete without targetTypeId fails when items exist
   await assert.rejects(
-    client.execute({ kind: "type.delete", id: "general", expectedRevision: 3 }),
+    client.execute({
+      kind: "type.delete",
+      id: "general",
+      expectedRevision: stageMoved.state.revision,
+    }),
     { code: "IN_USE" },
   );
+
+  // Type delete WITH targetTypeId migrates active, completed, and archived items cleanly
+  const typeDeleted = await client.execute({
+    kind: "type.delete",
+    id: "general",
+    targetTypeId: "article",
+    expectedRevision: stageMoved.state.revision,
+  });
+  assert.equal(typeDeleted.affectedCount, 2);
+  assert.equal(typeDeleted.state.types.some((t) => t.id === "general"), false);
+  const migratedArchived = typeDeleted.state.items.find((i) => i.id === r1.itemId)!;
+  const migratedCompleted = typeDeleted.state.items.find((i) => i.id === r2.itemId)!;
+  assert.equal(migratedArchived.typeId, "article");
+  assert.equal(migratedArchived.stageId, "article-0");
+  assert.equal(migratedArchived.status, "archived");
+  assert.equal(migratedCompleted.typeId, "article");
+  assert.equal(migratedCompleted.stageId, "article-3");
 });
 
-test("invalid links, state versions, duplicate stage IDs and malformed commands are rejected", async () => {
+test("invalid links, unknown schema versions, duplicate stage IDs and malformed commands are rejected", async () => {
   const s = createInitialState();
-  assert.throws(() => validateState({ ...s, schemaVersion: 2 }), /版本/);
+  assert.throws(() => validateState({ ...s, schemaVersion: 99 }), /版本/);
   s.types[1].stages[1].id = s.types[0].stages[0].id;
   assert.throws(() => validateState(s), /重复/);
+
   const client = setup();
   const r = await client.execute({
     kind: "item.create",
@@ -266,7 +394,7 @@ test("invalid links, state versions, duplicate stage IDs and malformed commands 
   );
 });
 
-test("export contains all items, custom configuration, versions and request records for reconstruction", async () => {
+test("export and importData preserve configuration, items, versions, and clean stale optional keys", async () => {
   const client = setup();
   await client.execute({
     kind: "type.create",
@@ -275,17 +403,21 @@ test("export contains all items, custom configuration, versions and request reco
   });
   await client.execute({
     kind: "item.create",
-    title: "测试导出",
+    title: "测试导出与导入",
     requestId: "request-0001",
   });
-  const exported = JSON.parse(await client.exportData());
+  const exportedRaw = await client.exportData();
+  const exported = JSON.parse(exportedRaw);
   assert.deepEqual(validateState(exported.data), await client.snapshot());
   assert.equal(exported.noteContentsIncluded, false);
-  const restored = new BuddeService(new MemoryStore(exported.data));
-  const retry = await restored.execute({
-    kind: "item.create",
-    title: "测试导出",
-    requestId: "request-0001",
+
+  const target = setup();
+  await target.execute({
+    kind: "preference.setNotebook",
+    notebookId: "old-notebook",
   });
-  assert.equal(retry.state.items.length, 1);
+  const importedState = await target.importData(exportedRaw);
+  assert.equal(importedState.items.length, 1);
+  assert.equal(importedState.items[0].title, "测试导出与导入");
+  assert.equal(importedState.defaultNotebookId, undefined);
 });

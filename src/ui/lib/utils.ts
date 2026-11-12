@@ -1,4 +1,15 @@
 import { clsx, type ClassValue } from "clsx";
 import { extendTailwindMerge } from "tailwind-merge";
-const merge = extendTailwindMerge({ prefix: "bd-" });
-export function cn(...inputs: ClassValue[]) { return merge(clsx(inputs)); }
+
+const merge = extendTailwindMerge({
+  prefix: "bd-",
+  extend: {
+    classGroups: {
+      "font-size": [{ text: ["control"] }],
+    },
+  },
+});
+
+export function cn(...inputs: ClassValue[]) {
+  return merge(clsx(inputs));
+}

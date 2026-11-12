@@ -1,1 +1,6 @@
-{ "openBudde": "打开 Budde 想法池与看板" }
+{
+  "openBudde": "打开 Budde 想法池与看板",
+  "quickCaptureBudde": "快速记录想法到 Budde",
+  "captureBlockToBudde": "收入 Budde 想法池",
+  "captureDocToBudde": "将本文档收入 Budde 想法池"
+}

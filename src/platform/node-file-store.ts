@@ -5,6 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { BuddeState, StateStore } from "../core/types";
 
 type Owner = { pid: number; token: string; hostname: string };
+
 export class StorageError extends Error {
   constructor(
     public readonly code: string,
@@ -15,12 +16,10 @@ export class StorageError extends Error {
     this.name = "StorageError";
   }
 }
+
 const pause = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 const codeOf = (error: unknown) => (error as NodeJS.ErrnoException)?.code;
-// Serialize short ownership transfers inside one renderer as well. Without
-// this, dozens of queued UI calls can starve the transaction trying to release
-// its main lock while all of them repeatedly contend for the transfer gate.
 const localGateTails = new Map<string, Promise<void>>();
 
 /** Same-machine desktop coordination only. File sync is not a distributed lock. */
@@ -48,7 +47,6 @@ export class NodeFileStore implements StateStore {
   private lockPaths() {
     return (this.paths ??= (async () => {
       await fs.mkdir(path.dirname(this.filePath), { recursive: true });
-      // Resolve aliases so two windows addressing the same workspace share a lock.
       const canonical = await fs.realpath(path.dirname(this.filePath));
       const key = createHash("sha256")
         .update(
@@ -97,11 +95,6 @@ export class NodeFileStore implements StateStore {
 
   private async createOwner(file: string, owner: Owner, deadline: number) {
     let handle: fs.FileHandle;
-    // Windows can keep an unlinked file delete-pending while another process
-    // briefly has a handle. CREATE_NEW then reports EPERM/EACCES, not EEXIST.
-    // Retry only the exclusive open, never the owner write: a failed write may
-    // already have created the file and must remain a fail-closed uncertain lock.
-    // A real permission denial is preserved after this short bounded retry.
     const retryUntil = Math.min(deadline, Date.now() + 200);
     while (true) {
       try {
@@ -122,12 +115,6 @@ export class NodeFileStore implements StateStore {
     }
   }
 
-  /**
-   * All main-lock transfers and recovery run under this short exclusive gate.
-   * This avoids two stale-lock observers deleting a newly acquired main lock.
-   * A crash *inside* the gate fails closed; we never guess that an empty or
-   * interrupted gate can be deleted. Recovery then requires closed instances.
-   */
   private async withGate<T>(
     gate: string,
     deadline: number,
@@ -235,6 +222,18 @@ export class NodeFileStore implements StateStore {
     }
   }
 
+  async hasChangedSince(mtimeMs: number): Promise<{ changed: boolean; mtimeMs: number }> {
+    try {
+      const stat = await fs.stat(this.filePath);
+      return { changed: stat.mtimeMs !== mtimeMs, mtimeMs: stat.mtimeMs };
+    } catch (error) {
+      if (codeOf(error) === "ENOENT") {
+        return { changed: mtimeMs !== 0, mtimeMs: 0 };
+      }
+      return { changed: true, mtimeMs };
+    }
+  }
+
   async read(): Promise<BuddeState> {
     let text: string;
     try {
@@ -268,7 +267,6 @@ export class NodeFileStore implements StateStore {
       await handle.sync();
       await handle.close();
       handle = undefined;
-      // Same-directory rename replaces the old snapshot atomically.
       await fs.rename(temporary, this.filePath);
     } catch (error) {
       throw new StorageError(
@@ -290,8 +288,8 @@ export class NodeFileStore implements StateStore {
       const result = mutate(draft);
       if (result instanceof Promise)
         throw new StorageError("ASYNC_MUTATION", "存储事务必须同步修改数据。");
-      this.validate(draft);
-      if (JSON.stringify(draft) !== previous) await this.persist(draft);
+      const validated = this.validate(draft);
+      if (JSON.stringify(validated) !== previous) await this.persist(validated);
       return result;
     } finally {
       await release();

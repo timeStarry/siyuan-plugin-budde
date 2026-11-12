@@ -1,1 +1,6 @@
-{ "openBudde": "Open Budde" }
+{
+  "openBudde": "Open Budde",
+  "quickCaptureBudde": "Quick Capture to Budde",
+  "captureBlockToBudde": "Capture Block to Budde Pool",
+  "captureDocToBudde": "Capture Document to Budde Pool"
+}

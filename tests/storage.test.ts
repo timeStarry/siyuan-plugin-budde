@@ -12,7 +12,7 @@ import { parseNoteId, SiYuanNotes } from "../src/platform/siyuan-notes";
 import type { BuddeState } from "../src/core/types";
 
 const initial = (): BuddeState => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   revision: 0,
   types: [],
   items: [],
@@ -20,7 +20,7 @@ const initial = (): BuddeState => ({
 });
 function validate(value: unknown): BuddeState {
   const state = value as BuddeState;
-  assert.equal(state.schemaVersion, 1);
+  assert.equal(state.schemaVersion, 2);
   assert.ok(Number.isInteger(state.revision));
   assert.ok(Array.isArray(state.items));
   return state;
@@ -237,6 +237,7 @@ test("note resolution uses current session and checks existence before opening",
     }) as typeof fetch,
   );
   assert.deepEqual(await bridge.resolve(id), {
+    id,
     target: `siyuan://blocks/${id}`,
     title: "关联标题",
   });

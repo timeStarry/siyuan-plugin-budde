@@ -1,8 +1,8 @@
 {
   "name": "siyuan-plugin-budde",
   "author": "timeStarry",
-  "url": "https://github.com/timeStarry",
-  "version": "0.1.0-alpha.3",
+  "url": "https://github.com/timeStarry/siyuan-plugin-budde",
+  "version": "0.2.0",
   "minAppVersion": "3.4.1",
   "backends": ["windows", "linux", "darwin"],
   "frontends": ["desktop", "desktop-window"],

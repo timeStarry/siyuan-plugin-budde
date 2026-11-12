@@ -34,4 +34,8 @@ test("Tailwind CSS compiles real utilities without global preflight or unprefixe
   assert.doesNotMatch(css, /(^|\n)\s*(html|body|\*,|button,)/);
   assert.doesNotMatch(css, /(^|\n)\.flex\s*\{/);
   for (const rgb of ["249 250 251", "243 244 246", "228 228 231"]) assert.ok(css.includes(rgb), rgb);
+  const { cn } = await import(pathToFileURL(path.join(root, "src/ui/lib/utils.ts")).href);
+  const merged = cn("bd-bg-primary bd-text-primary-foreground", "bd-text-control");
+  assert.match(merged, /bd-text-primary-foreground/, "custom bd-text-control font-size must not strip text color");
+  assert.match(merged, /bd-text-control/);
 });
