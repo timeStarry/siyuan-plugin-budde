@@ -286,7 +286,130 @@ export function validateState(value: unknown): BuddeState {
   return value as unknown as BuddeState;
 }
 
-export function createInitialState(): BuddeState {
+export function createSampleItems(nowIso = new Date().toISOString()): Item[] {
+  const baseMs = Number.isFinite(Date.parse(nowIso)) ? Date.parse(nowIso) : Date.now();
+  const daysAgo = (days: number) => new Date(baseMs - Math.round(days * 86_400_000)).toISOString();
+
+  return [
+    {
+      id: "sample-pool-writing",
+      title: "写一篇《为什么想法池不应该强迫填截止日期》",
+      typeId: "article",
+      stageId: "article-0",
+      status: "pool",
+      pinned: false,
+      order: 1000,
+      description: "",
+      nextStep: "",
+      links: [],
+      createdAt: daysAgo(0.2),
+      updatedAt: daysAgo(0.2),
+      reviewedAt: null,
+      version: 1,
+    },
+    {
+      id: "sample-pool-reading",
+      title: "精读《卡片盒笔记法》，对比卢曼编号与思源块引用的异同",
+      typeId: "reading",
+      stageId: "reading-0",
+      status: "pool",
+      pinned: false,
+      order: 2000,
+      description: "重点关注「文献笔记 → 永久笔记」在思源双链与块级引用下的最小可行落地方式。",
+      nextStep: "",
+      links: [],
+      createdAt: daysAgo(1),
+      updatedAt: daysAgo(1),
+      reviewedAt: null,
+      version: 1,
+    },
+    {
+      id: "sample-pool-daily",
+      title: "周末重新理一下桌面线材与显示器高度",
+      typeId: "general",
+      stageId: "general-0",
+      status: "pool",
+      pinned: false,
+      order: 3000,
+      description: "",
+      nextStep: "",
+      links: [],
+      createdAt: daysAgo(2),
+      updatedAt: daysAgo(2),
+      reviewedAt: null,
+      version: 1,
+    },
+    {
+      id: "sample-active-project",
+      title: "用思源搭一套不焦虑的「念头 → 产出」个人工作流",
+      typeId: "project",
+      stageId: "project-2",
+      status: "active",
+      pinned: true,
+      order: 4000,
+      description: "Budde 只管轻量阶段与下一步行动，长篇架构草稿与正文直接交给思源笔记承载。",
+      nextStep: "打开右侧详情，点击「新建文档」体验一键创建并挂载产出笔记",
+      links: [],
+      createdAt: daysAgo(5),
+      updatedAt: daysAgo(1),
+      reviewedAt: daysAgo(1),
+      version: 1,
+    },
+    {
+      id: "sample-active-writing-draft",
+      title: "整理近半年收藏夹里一直没看的几篇深度长文导读",
+      typeId: "article",
+      stageId: "article-2",
+      status: "active",
+      pinned: false,
+      order: 5000,
+      description: "把「发散写初稿」和「收敛改定稿」拆开，降低动笔时的完美主义阻力。",
+      nextStep: "先不纠结措辞把三篇核心观点的初稿顺下来，周末再进润色定稿",
+      links: [],
+      createdAt: daysAgo(20),
+      updatedAt: daysAgo(16),
+      reviewedAt: daysAgo(16),
+      version: 1,
+    },
+    {
+      id: "sample-paused-project",
+      title: "做一个命令行网页剪藏直达思源每日笔记的小工具",
+      typeId: "project",
+      stageId: "project-1",
+      status: "paused",
+      pinned: false,
+      order: 6000,
+      description: "暂时搁置的点子也不必删掉，设为「暂停」即可体面移出当前焦点视线。",
+      nextStep: "等主线忙完后，先对比官方剪藏扩展与本地脚本的边界再决定是否开工",
+      links: [],
+      createdAt: daysAgo(12),
+      updatedAt: daysAgo(8),
+      reviewedAt: daysAgo(8),
+      version: 1,
+    },
+    {
+      id: "sample-done-daily",
+      title: "熟悉 Budde：按 C 快速记一条念头，拖卡片切换阶段",
+      typeId: "general",
+      stageId: "general-3",
+      status: "active",
+      pinned: false,
+      order: 7000,
+      description: "",
+      nextStep: "可在看板体验一键「归档已完成」，或在右上角「…」菜单清空全部示例事项",
+      links: [],
+      createdAt: daysAgo(3),
+      updatedAt: daysAgo(0.1),
+      reviewedAt: daysAgo(0.1),
+      version: 1,
+    },
+  ];
+}
+
+export function createInitialState(options?: {
+  withSamples?: boolean;
+  now?: string;
+}): BuddeState {
   const presets: Array<{
     id: string;
     name: string;
@@ -297,42 +420,42 @@ export function createInitialState(): BuddeState {
   }> = [
     {
       id: "general",
-      name: "通用",
+      name: "日常",
       icon: "Lightbulb",
       color: "amber",
       reviewDays: 14,
-      stages: ["想法", "准备做", "进行中", "完成"],
+      stages: ["想法", "准备做", "进行中", "已完成"],
     },
     {
       id: "article",
-      name: "文章",
+      name: "写作",
       icon: "PenLine",
       color: "blue",
       reviewDays: 14,
-      stages: ["选题", "写作", "修改", "已发布"],
+      stages: ["选题", "大纲素材", "初稿", "润色定稿", "已发布"],
     },
     {
-      id: "software",
-      name: "软件",
+      id: "project",
+      name: "项目开发",
       icon: "Code2",
       color: "violet",
       reviewDays: 7,
-      stages: ["想法", "验证", "开发", "已发布"],
+      stages: ["构想", "方案设计", "原型实现", "打磨验收", "已发布"],
     },
     {
-      id: "travel",
-      name: "旅行",
-      icon: "Compass",
+      id: "reading",
+      name: "阅读与课题",
+      icon: "BookOpen",
       color: "emerald",
       reviewDays: 30,
-      stages: ["想去", "规划", "已预订", "已结束"],
+      stages: ["想读", "在读摘录", "消化整理", "已沉淀"],
     },
   ];
 
   return {
     schemaVersion: 2,
     revision: 0,
-    items: [],
+    items: options?.withSamples ? createSampleItems(options.now) : [],
     requests: {},
     types: presets.map((preset) => ({
       id: preset.id,
@@ -699,6 +822,21 @@ export class BuddeService implements BuddeClient {
         pruneRequests(state, removedIds);
         affectedCount = removedIds.size;
         if (removedIds.size === 0) return { state: structuredClone(state), affectedCount: 0 };
+      } else if (command.kind === "items.clearAll") {
+        checkVersion(state.revision, command.expectedRevision);
+        affectedCount = state.items.length;
+        if (affectedCount === 0 && Object.keys(state.requests).length === 0) {
+          return { state: structuredClone(state), affectedCount: 0 };
+        }
+        state.items = [];
+        state.requests = {};
+      } else if (command.kind === "state.resetDemo") {
+        checkVersion(state.revision, command.expectedRevision);
+        const fresh = createInitialState({ withSamples: true, now });
+        state.types = fresh.types;
+        state.items = fresh.items;
+        state.requests = {};
+        affectedCount = state.items.length;
       } else if (command.kind === "item.syncNoteTitles") {
         let changed = false;
         for (const item of state.items) {

@@ -366,6 +366,57 @@ export function WorkbenchApp() {
               <Icon name="refresh" />
               重新读取磁盘数据
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={async () => {
+                const ok = await confirm({
+                  title: "重置为默认类型与示例？",
+                  description:
+                    "将恢复「日常、写作、项目开发、阅读与课题」4 个默认类型及 7 条精选示例事项，替换当前 Budde 中的事项与类型配置（不影响任何思源笔记正文；如有重要记录建议先导出 JSON 备份）。",
+                  confirmLabel: "确认重置示例",
+                });
+                if (!ok) return;
+                const res = await execute(
+                  {
+                    kind: "state.resetDemo",
+                    expectedRevision: state.revision,
+                  },
+                  { successMessage: "已恢复默认类型与示例事项" },
+                );
+                if (res.ok) {
+                  setSelectedId("");
+                  setFilters((prev) => ({ ...prev, query: "", typeId: "", activeFocus: "all" }));
+                }
+              }}
+            >
+              <Icon name="undo" />
+              重置为默认示例…
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              destructive
+              disabled={state.items.length === 0}
+              onSelect={async () => {
+                const ok = await confirm({
+                  title: "清空全部事项？",
+                  description: `将清空当前工作台中的全部 ${state.items.length} 个事项（含归档），当前自定义的类型与阶段配置保持不变，思源笔记正文不受影响。`,
+                  confirmLabel: "确认清空事项",
+                  destructive: true,
+                });
+                if (!ok) return;
+                const res = await execute(
+                  {
+                    kind: "items.clearAll",
+                    expectedRevision: state.revision,
+                  },
+                  { successMessage: "已清空全部事项" },
+                );
+                if (res.ok) {
+                  setSelectedId("");
+                }
+              }}
+            >
+              <Icon name="trash" />
+              清空全部事项…
+            </DropdownMenuItem>
           </DropdownMenu>
 
           <input

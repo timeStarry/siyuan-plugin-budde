@@ -80,7 +80,11 @@ export default class BuddePlugin extends Plugin {
         throw new Error("未找到当前思源工作空间。Budde 需要思源桌面端。");
       }
       this.service = new BuddeService(
-        new NodeFileStore(dataDir, createInitialState, validateState),
+        new NodeFileStore(
+          dataDir,
+          () => createInitialState({ withSamples: true }),
+          validateState,
+        ),
       );
       this.notes = new SiYuanNotes(async (id) => {
         await openTab({ app: this.app, doc: { id } });

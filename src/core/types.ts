@@ -122,6 +122,14 @@ export type Command =
       typeId?: string;
     }
   | {
+      kind: "items.clearAll";
+      expectedRevision: number;
+    }
+  | {
+      kind: "state.resetDemo";
+      expectedRevision: number;
+    }
+  | {
       kind: "item.syncNoteTitles";
       titles: Record<string, { title: string; hpath?: string }>;
     }

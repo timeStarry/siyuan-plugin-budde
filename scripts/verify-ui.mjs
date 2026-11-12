@@ -27,11 +27,11 @@ try {
   await captureInput.press("Enter");
   await expect(captureInput).toHaveValue("");
 
-  await page.locator('[data-part="create-type"]').selectOption("software");
+  await page.locator('[data-part="create-type"]').selectOption("project");
   await captureInput.fill("支持快捷键一键捕获想法");
   await captureInput.press("Enter");
 
-  // Capture directly as Active in software type
+  // Capture directly as Active in project type
   await page.getByRole("button", { name: "存想法池" }).click();
   await expect(page.getByRole("button", { name: "直接推进" })).toHaveAttribute("aria-pressed", "true");
   await captureInput.fill("实现思源文档双向关联搜索");
@@ -107,8 +107,8 @@ try {
 
   // 4. Board View: type switcher, stage columns, Ghost Column, stage move & batch archive
   await page.locator('[data-view="board"]').click();
-  await page.locator('[data-type-row="software"] button').first().click();
-  await expect(page.locator(".stage-column")).toHaveCount(4);
+  await page.locator('[data-type-row="project"] button').first().click();
+  await expect(page.locator(".stage-column")).toHaveCount(5);
 
   // Check column minimum width >= 240px and no nested vertical scrollbars
   const colMetrics = await page.locator(".stage-column").evaluateAll((cols) =>
@@ -127,11 +127,11 @@ try {
   const ghostInput = page.getByRole("textbox", { name: "新阶段名称" });
   await ghostInput.fill("灰度内测");
   await ghostInput.press("Enter");
-  await expect(page.locator(".stage-column")).toHaveCount(5);
+  await expect(page.locator(".stage-column")).toHaveCount(6);
 
-  // Open software card in Detail & take 1440x900 Light & Dark screenshots
+  // Open project card in Detail & take 1440x900 Light & Dark screenshots
   await page.locator(".card-open", { hasText: "实现思源文档双向关联搜索" }).click();
-  await detail.locator(".stage-path button", { hasText: "开发" }).click();
+  await detail.locator(".stage-path button", { hasText: "原型实现" }).click();
   await page.screenshot({ path: `${qaDir}/workbench-1440-light.png`, animations: "disabled" });
 
   await page.evaluate(() => {
@@ -142,7 +142,7 @@ try {
     delete document.documentElement.dataset.themeMode;
   });
 
-  // Move software item to completed stage ("已发布") and batch archive completed
+  // Move project item to completed stage ("已发布") and batch archive completed
   await detail.locator(".stage-path button", { hasText: "已发布" }).click();
   await page.keyboard.press("Escape");
   await expect(detail).toHaveCount(0);
@@ -205,6 +205,19 @@ try {
   );
   expect(hasHorizontalOverflow).toBe(false);
   await page.screenshot({ path: `${qaDir}/narrow-360.png`, animations: "disabled" });
+
+  // 9. Overflow menu: reset to default demo & clear all items
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole("button", { name: "数据与更多操作" }).click();
+  await page.getByRole("menuitem", { name: "重置为默认示例…" }).click();
+  await page.locator('[data-budde-modal="true"]').getByRole("button", { name: "确认重置示例" }).click();
+  await expect(page.locator('[data-view="pool"]')).toContainText("3");
+  await expect(page.locator('[data-view="active"]')).toContainText("2");
+
+  await page.getByRole("button", { name: "数据与更多操作" }).click();
+  await page.getByRole("menuitem", { name: "清空全部事项…" }).click();
+  await page.locator('[data-budde-modal="true"]').getByRole("button", { name: "确认清空事项" }).click();
+  await expect(page.locator(".empty-state")).toBeVisible();
 
   expect(errors).toEqual([]);
   console.log(

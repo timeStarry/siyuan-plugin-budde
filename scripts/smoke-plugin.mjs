@@ -119,7 +119,7 @@ try {
   // Wait briefly for async captureFromEditor transaction
   await new Promise((r) => setTimeout(r, 80));
   const state = await plugin.service.snapshot();
-  assert.equal(state.items.length, 1);
+  assert.equal(state.items.length, 8);
   assert.equal(state.items[0].title, "阅读笔记中涌现的新想法");
   assert.equal(state.items[0].links[0].target, "siyuan://blocks/20260101120000-blktest");
 

@@ -126,8 +126,9 @@ test("type templates are created atomically with fresh IDs and default presentat
   const type = state.types.at(-1)!;
   assert.deepEqual(type.stages.map(({ name, completed }) => ({ name, completed })), [
     { name: "选题", completed: false },
-    { name: "写作", completed: false },
-    { name: "修改", completed: false },
+    { name: "大纲素材", completed: false },
+    { name: "初稿", completed: false },
+    { name: "润色定稿", completed: false },
     { name: "已发布", completed: true },
   ]);
   assert.equal(type.initialStageId, type.stages[0].id);

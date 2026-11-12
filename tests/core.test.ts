@@ -351,7 +351,7 @@ test("stage deletion and type deletion with targetTypeId migrate items (includin
   assert.equal(migratedArchived.stageId, "article-0");
   assert.equal(migratedArchived.status, "archived");
   assert.equal(migratedCompleted.typeId, "article");
-  assert.equal(migratedCompleted.stageId, "article-3");
+  assert.equal(migratedCompleted.stageId, "article-4");
 });
 
 test("invalid links, unknown schema versions, duplicate stage IDs and malformed commands are rejected", async () => {
@@ -420,4 +420,47 @@ test("export and importData preserve configuration, items, versions, and clean s
   assert.equal(importedState.items.length, 1);
   assert.equal(importedState.items[0].title, "测试导出与导入");
   assert.equal(importedState.defaultNotebookId, undefined);
+});
+
+test("onboarding sample seed, state.resetDemo, and items.clearAll maintain valid schema and preserve notebook preference", async () => {
+  const seeded = validateState(
+    createInitialState({ withSamples: true, now: "2026-11-12T12:00:00.000Z" }),
+  );
+  assert.deepEqual(
+    seeded.types.map((t) => [t.id, t.name]),
+    [
+      ["general", "日常"],
+      ["article", "写作"],
+      ["project", "项目开发"],
+      ["reading", "阅读与课题"],
+    ],
+  );
+  assert.deepEqual(
+    seeded.types.find((t) => t.id === "article")!.stages.map((s) => s.name),
+    ["选题", "大纲素材", "初稿", "润色定稿", "已发布"],
+  );
+  assert.deepEqual(
+    seeded.types.find((t) => t.id === "project")!.stages.map((s) => s.name),
+    ["构想", "方案设计", "原型实现", "打磨验收", "已发布"],
+  );
+  assert.equal(seeded.items.length, 7);
+
+  const client = setup();
+  await client.execute({ kind: "preference.setNotebook", notebookId: "nb-keep" });
+  let s = await client.snapshot();
+  const demo = await client.execute({
+    kind: "state.resetDemo",
+    expectedRevision: s.revision,
+  });
+  assert.equal(demo.state.items.length, 7);
+  assert.equal(demo.state.defaultNotebookId, "nb-keep");
+
+  const cleared = await client.execute({
+    kind: "items.clearAll",
+    expectedRevision: demo.state.revision,
+  });
+  assert.equal(cleared.affectedCount, 7);
+  assert.equal(cleared.state.items.length, 0);
+  assert.equal(cleared.state.types.length, 4);
+  assert.equal(cleared.state.defaultNotebookId, "nb-keep");
 });
