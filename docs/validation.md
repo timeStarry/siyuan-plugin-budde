@@ -1,4 +1,17 @@
-# Budde 验证记录 — 当前 0.1.0-alpha.2
+# Budde 验证记录 — 当前 0.1.0-alpha.3
+
+## 当前修复：宿主 SVG 填充隔离（2026-11-12）
+
+- 用户的真实截图揭示 alpha.2 的合成宿主测试漏检：思源 3.8.10 全局 `svg { fill:currentColor; display:inline-block }` 覆盖 SVG 的 `fill="none"` 表现属性，普通图标实际变成实心。原先仅凭属性和隔离预览确认线框的结论不成立。
+- 已先补回归并观察实际 computed fill 非 none 的 RED，再在已有 `.budde :where(svg)` 局部 reset 加入 `fill:none`，不使用 `!important`、不影响宿主外部图标、不改图标路径/尺寸、事项逻辑、schemaVersion 或存储。
+- 回归仅加载正式 CJS 与打包 CSS，移除预览源 CSS 防止假 GREEN；覆盖深浅主题 × 宿主样式前后顺序，断言 SVG 和子图形实际填充、currentColor、16px/1.5px 与原品牌 24px/1.75px，以及外部宿主图标保持原填充。
+- 修复范围只读复核无 actionable Critical / Important / Minor。复核不冒充原生宿主或发布过程验收。
+- 用户随后明确同意继续提交、发布修复版、安装并安全重启，并在集成确认中选择“合并到 main 后发布”。版本提升为 alpha.3，保留 alpha.2 已发布 ZIP/标签；真实事项和启用配置仅比较存在性/大小/SHA-256，不读取内容或加入夹具。
+- 发布前首轮门禁的旧主交互测试在拖放后立即打开设置时失败。诊断复现 `type.settings` 点击在 dnd-kit 的 50ms document-capture 点击抑制尚未清理时被拦截，未到达工作台。测试改为轮询根节点点击传播恢复后再发真实点击，不使用固定 sleep、不放宽断言、不改运行时拖拽代码；[诊断记录](../artifacts/qa/alpha3-ui-diagnostic.log)保留失败证据。
+- 修正测试同步后，最终串行执行 `pnpm check` → `pnpm test:ui` → `pnpm test:plugin` → `pnpm package:plugin` → `pnpm test:release`，完整命令 exit 0：核心 39/39、浏览器 156 组/组合、打包 CJS 宿主、可复现 ZIP 与合成覆盖安装全部通过；`git diff --check` 通过。[完整门禁日志](../artifacts/qa/alpha3-release-final-20261112.log)保留完整套件输出及最终成功标记。用户集成确认后，因跨夜等待重新执行相同完整门禁，仍整条 exit 0，ZIP 字节不变，见[授权后最新门禁](../artifacts/qa/alpha3-approved-release-20261112.log)。未更改依赖；pnpm 现有 workspace/node_modules 元数据不同步警告保留在日志中，没有伪装成已修复。
+- [alpha.3 ZIP](../artifacts/release/siyuan-plugin-budde-0.1.0-alpha.3.zip)：430,482 bytes，SHA-256 `aa75da5bea2845d09a7c54100e5bba6265dc002f03b6fca3aacde8633388265e`，附[校验文件](../artifacts/release/siyuan-plugin-budde-0.1.0-alpha.3.zip.sha256)。仅含原六项运行文件；字体及 OFL 断言通过。alpha.2 ZIP 的原 SHA-256 经再次比较保持不变。
+- alpha.3 后续远端发布及逐阶段安装证据单独记录；以下 alpha.2 及更早章节均为历史记录，不构成 alpha.3 原生窗口或全平台验收声明。
+
 
 日期：2026-11-11。目标宿主为思源 3.4.1+ 桌面端；自动化环境为 Windows、本机 Edge。测试仅使用合成数据和临时目录，不读写真实思源工作空间。
 

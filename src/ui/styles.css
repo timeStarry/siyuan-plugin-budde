@@ -23,7 +23,8 @@
 .budde :where(button:disabled) { cursor:default; }
 .budde :where(input,textarea,select) { max-width:100%; min-width:0; }
 .budde :where(textarea) { resize:vertical; }
-.budde :where(svg) { display:block; vertical-align:middle; }
+/* SiYuan's global svg { fill:currentColor } overrides SVG presentation attributes. */
+.budde :where(svg) { display:block; vertical-align:middle; fill:none; }
 .budde :where(dialog) { inset:auto; min-width:0; }
 .budde :where(dialog:not([open])) { display:none; }
 .budde [hidden] { display:none!important; }

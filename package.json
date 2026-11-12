@@ -1,6 +1,6 @@
 {
   "name": "siyuan-plugin-budde",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "private": true,
   "description": "Budde：思源里的轻量想法池与生命周期看板",
   "type": "module",
