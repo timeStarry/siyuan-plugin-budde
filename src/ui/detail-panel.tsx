@@ -415,7 +415,7 @@ function DetailContent({
         <section className="stage-path bd-space-y-2.5" aria-label="阶段路径">
           <div className="bd-flex bd-items-center bd-justify-between">
             <h3 className="bd-text-xs bd-font-medium bd-text-muted-foreground">
-              生命周期阶段
+              阶段
             </h3>
             <span className="bd-text-xs bd-text-muted-foreground bd-tabular-nums">
               {currentStageIndex >= 0

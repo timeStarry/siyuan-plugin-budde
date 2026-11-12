@@ -87,7 +87,7 @@ export function BoardView({
       >
         <div className="bd-flex bd-shrink-0 bd-items-center bd-justify-between bd-px-2 bd-py-1 [@container(max-width:760px)]:bd-px-1">
           <span className="bd-text-xs bd-font-medium bd-text-muted-foreground [@container(max-width:760px)]:bd-sr-only">
-            生命周期类型
+            事项类型
           </span>
           <Button
             variant="ghost"
@@ -199,7 +199,8 @@ export function BoardView({
                 <Icon name="search" />
               </span>
               <Input
-                type="search"
+                type="text"
+                role="searchbox"
                 aria-label="搜索看板事项"
                 placeholder="搜索标题、下一步…"
                 value={filters.query}

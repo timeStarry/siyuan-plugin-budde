@@ -250,7 +250,8 @@ export function TypePicker({
       {tab === "icons" ? (
         <div className="bd-space-y-2">
           <Input
-            type="search"
+            type="text"
+            role="searchbox"
             aria-label="搜索图标"
             placeholder="搜索图标，如：写作、代码、旅行、灵感…"
             value={query}

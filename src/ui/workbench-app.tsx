@@ -838,7 +838,8 @@ function FilterToolbar({
           <Icon name="search" />
         </span>
         <Input
-          type="search"
+          type="text"
+          role="searchbox"
           aria-label="搜索事项"
           placeholder="搜索标题、说明、笔记…"
           value={filters.query}

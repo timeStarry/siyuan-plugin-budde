@@ -108,7 +108,7 @@ export function SettingsModal({
     >
       <div className="bd-flex bd-shrink-0 bd-items-center bd-justify-between bd-border-b bd-border-border bd-px-5 bd-py-3.5">
         <div>
-          <h2 className="bd-text-base bd-font-semibold">管理类型与生命周期阶段</h2>
+          <h2 className="bd-text-base bd-font-semibold">管理类型与阶段</h2>
           <p className="bd-text-xs bd-text-muted-foreground">
             自定义事项分类、专属阶段路径、图标配色及复查提醒周期
           </p>

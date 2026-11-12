@@ -210,10 +210,25 @@ try {
     delete document.documentElement.dataset.themeMode;
   });
 
-  // Verify SettingsModal & TypePicker `input[type="search"]` box-sizing & bounds against SiYuan `input[type=search] { box-sizing: content-box }`
+  // Verify FilterToolbar searchbox height matches adjacent select (exact 32px)
+  const toolbarMetrics = await page.evaluate(() => {
+    const search = document.querySelector('[aria-label="搜索事项"]');
+    const select = document.querySelector('[aria-label="按类型筛选"]');
+    return {
+      searchHeight: search.getBoundingClientRect().height,
+      selectHeight: select.getBoundingClientRect().height,
+      searchBoxSizing: getComputedStyle(search).boxSizing,
+    };
+  });
+  expect(toolbarMetrics.searchBoxSizing).toBe("border-box");
+  expect(Math.abs(toolbarMetrics.searchHeight - 32)).toBeLessThanOrEqual(0.5);
+  expect(Math.abs(toolbarMetrics.searchHeight - toolbarMetrics.selectHeight)).toBeLessThanOrEqual(0.5);
+
+  // Verify SettingsModal & TypePicker searchbox box-sizing & bounds against SiYuan `input[type=search] { box-sizing: content-box }`
   await page.getByRole("button", { name: "管理类型与阶段" }).click();
   const settingsModal = page.locator('[data-budde-modal="true"]');
   await expect(settingsModal).toBeVisible();
+  await expect(settingsModal.locator("h2.bd-text-base")).toHaveText("管理类型与阶段");
   await settingsModal.getByRole("button", { name: "更换图标与配色" }).click();
   const iconSearch = settingsModal.getByRole("searchbox", { name: "搜索图标" });
   await expect(iconSearch).toBeVisible();
@@ -235,10 +250,11 @@ try {
   await settingsModal.getByRole("button", { name: "关闭设置" }).click();
   await expect(settingsModal).toHaveCount(0);
 
-  // Verify clicking card opens DetailPanel
+  // Verify clicking card opens DetailPanel and renders concise "阶段" label
   await page.locator(".card-open", { hasText: "构建产物页签初始化" }).click();
   await expect(page.locator(".detail-pane")).toBeVisible();
   await expect(page.getByRole("textbox", { name: "事项标题" })).toHaveValue("构建产物页签初始化");
+  await expect(page.locator(".detail-pane .stage-path h3")).toHaveText("阶段");
 
   // Verify brand SVG path parity between host topbar symbol and workbench header
   const hostMark = await page.evaluate(() => {
