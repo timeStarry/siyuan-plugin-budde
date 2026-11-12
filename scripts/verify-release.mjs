@@ -7,7 +7,7 @@ import path from 'node:path';
 import os from 'node:os';
 const manifest=JSON.parse(await readFile('dist/plugin.json','utf8'));
 const zipPath=`artifacts/release/${manifest.name}-${manifest.version}.zip`;
-const zip=await readFile(zipPath);const expected=['index.js','index.css','plugin.json','README.md','i18n/zh_CN.json','i18n/en_US.json'];
+const zip=await readFile(zipPath);const expected=['index.js','index.css','plugin.json','README.md','THIRD_PARTY_NOTICES.md','i18n/zh_CN.json','i18n/en_US.json'];
 const names=[];let cursor=0;
 while(zip.readUInt32LE(cursor)===0x04034b50){
   assert.equal(zip.readUInt16LE(cursor+8),8);const packed=zip.readUInt32LE(cursor+18);const size=zip.readUInt32LE(cursor+22);const len=zip.readUInt16LE(cursor+26);const extra=zip.readUInt16LE(cursor+28);const name=zip.subarray(cursor+30,cursor+30+len).toString();names.push(name);
@@ -32,5 +32,6 @@ assert.ok(embeddedFont,'Release CSS must include the offline brand font');
 const embeddedFontSha256=createHash('sha256').update(Buffer.from(embeddedFont,'base64')).digest('hex');
 assert.equal(embeddedFontSha256,'39c9b64223561f56aaff6062a6f04063c4fc86809ad6768722c06614d977e1cc','Release font must preserve the official unmodified bytes');
 const license=(await readFile('src/ui/assets/Quicksand-OFL.txt','utf8')).trim();
-assert.ok((await readFile('dist/README.md','utf8')).includes(license),'Release README must include the full font copyright/license');
+assert.ok((await readFile('dist/THIRD_PARTY_NOTICES.md','utf8')).includes(license),'Release THIRD_PARTY_NOTICES.md must include the full font copyright/license');
+assert.match(await readFile('dist/README.md','utf8'),/THIRD_PARTY_NOTICES\.md/);
 console.log(JSON.stringify({zipPath,bytes:zip.length,sha256:expectedHash,entries:names,embeddedFontSha256,fontLicenseIncluded:true,syntheticWorkspace:workspace,upgradePreservedStorageAndEnableConfig:true},null,2));

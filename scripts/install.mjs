@@ -32,6 +32,7 @@ for (const file of [
   "index.css",
   "plugin.json",
   "README.md",
+  "THIRD_PARTY_NOTICES.md",
   "i18n/zh_CN.json",
   "i18n/en_US.json",
 ]) {

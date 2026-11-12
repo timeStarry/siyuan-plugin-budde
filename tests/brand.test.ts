@@ -44,6 +44,9 @@ test("production CSS embeds the unmodified offline Quicksand font and scopes the
   assert.match(css, /\.budde\s+\.bd-font-brand\s*\{[^}]*font-family:\s*BuddeBrandQuicksand/);
   assert.doesNotMatch(css.match(/\.budde\s*\{[^}]*font-family:[^;]+/)?.[0] ?? "", /BuddeBrandQuicksand/);
   const license = await readFile(path.join(root, "src/ui/assets/Quicksand-OFL.txt"), "utf8");
+  const notices = await readFile(path.join(root, "THIRD_PARTY_NOTICES.md"), "utf8");
   const readme = await readFile(path.join(root, "README.md"), "utf8");
-  assert.ok(readme.includes(license.trim()), "the README distributed in the six-file ZIP must include the complete font license");
+  assert.ok(notices.includes(license.trim()), "standalone THIRD_PARTY_NOTICES.md must include the complete font license");
+  assert.match(readme, /THIRD_PARTY_NOTICES\.md/, "README must link to THIRD_PARTY_NOTICES.md");
+  assert.doesNotMatch(readme, /SIL OPEN FONT LICENSE Version 1\.1 - 26 February 2007/);
 });
