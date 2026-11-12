@@ -125,6 +125,16 @@ try {
   await expect(page.locator('[data-drag-overlay]')).toBeVisible();
   await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + 100, {steps: 12}); await page.mouse.up();
   await expect.poll(async () => (await snapshot()).items.find(i => i.id === currentItem.id).stageId).toBe(software.initialStageId);
+  // dnd-kit suppresses document clicks briefly after pointer drop. Wait for
+  // propagation to resume before the next real click, without fixed sleeps.
+  await expect.poll(() => page.evaluate(() => {
+    const root = document.querySelector('.budde'); let reached = false;
+    const probe = () => { reached = true; };
+    root.addEventListener('click', probe, true);
+    try { root.dispatchEvent(new MouseEvent('click', { bubbles: true })); }
+    finally { root.removeEventListener('click', probe, true); }
+    return reached;
+  })).toBe(true);
   passed.push('explicit cross-type migration, keyboard and drag board movement');
   // Config CRUD, optimistic conflict retention, initial stage, completed independent of order.
   const softwareSettings = page.locator('[data-type-row="software"] [data-action="type.settings"]');

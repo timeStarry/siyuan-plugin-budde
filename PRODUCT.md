@@ -20,8 +20,8 @@ Budde 是运行在思源笔记内的插件，不是独立网站或独立应用�
 
 - 正式产品需求的唯一源头：思源文档 `20261111001236-5io3spm`（Budde｜需求文档）。本文件仅为设计工作摘要，不替代原需求。
 - 用户从思源顶栏、命令或快捷键打开插件工作台，在阅读与写作之间记录、找回和推进事项。
-- 当前仓库为 `0.1.0-alpha.2`，采用 React + TypeScript + Tailwind + 本地所有权 shadcn 组件；核心服务、平台适配和 UI 分离。
-- 用户已批准 [alpha.2 综合升级](docs/superpowers/specs/2026-11-11-alpha2-design.md)，选择“垂直时间轴，直接执行”；沿用 36px 中性工作台、原小芽与离线 Quicksand 品牌字标。不自动安装到真实工作空间、重启或改变启用状态，不提交/合并/推送。
+- 当前仓库为 `0.1.0-alpha.3`，采用 React + TypeScript + Tailwind + 本地所有权 shadcn 组件；核心服务、平台适配和 UI 分离。
+- 用户已批准 [alpha.2 综合升级](docs/superpowers/specs/2026-11-11-alpha2-design.md)，选择“垂直时间轴，直接执行”；沿用 36px 中性工作台、原小芽与离线 Quicksand 品牌字标。alpha.3 只修复宿主 SVG 填充覆盖；用户另行授权本轮提交、发布、安装及安全重启，不改变事项或启用配置。
 - 持久化视觉与交互约束以 [UI 设计系统](ui-design-system.md) 为准；旧绿色/40px/默认可编辑方案、横向阶段路径及普通 1.75px 图标约定已被后续批准方案覆盖。
 
 ## Capabilities and Constraints
