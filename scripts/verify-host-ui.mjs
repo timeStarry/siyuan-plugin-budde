@@ -15,8 +15,10 @@ try {
   await page.setViewportSize({ width: 1440, height: 900 });
 
   await page.evaluate(() => {
-    // Emulate SiYuan desktop global CSS PLUS high-specificity container/dialog/path theme selectors
-    // that previously defeated zero-specificity `.budde :where(svg) { fill: none }`.
+    // Emulate SiYuan desktop global CSS (`base.*.css`) including:
+    // - global & high-specificity container/dialog/path SVG fill rules
+    // - `input[type=search] { box-sizing: content-box; -webkit-appearance: textfield }` (specificity 0,1,1)
+    // - form control, link, dialog, and scrollbar global rules
     document.body.classList.add("layout-tab-container");
     const style = document.createElement("style");
     style.id = "synthetic-siyuan-svg";
@@ -24,6 +26,17 @@ try {
       "svg { fill: currentColor; display: inline-block; }",
       ".layout-tab-container svg, .b3-dialog svg, html[data-theme-mode] svg { fill: currentColor; }",
       ".layout-tab-container svg path, .layout-tab-container svg circle, .layout-tab-container svg rect { fill: currentColor; }",
+      "button, input, select, textarea { margin: 0; font-size: 100%; vertical-align: middle; outline: none; }",
+      "button, input { line-height: normal; }",
+      "button, input[type=button], input[type=reset], input[type=submit] { cursor: pointer; -webkit-appearance: button; }",
+      "input[type=search] { box-sizing: content-box; -webkit-appearance: textfield; }",
+      "a { outline: 0; text-decoration: underline; color: #3575f0; }",
+      "::-webkit-scrollbar-thumb { box-sizing: content-box; border: 4px solid transparent; box-shadow: inset 0 0 5px 5px rgba(0,0,0,0.2); }",
+      ".b3-dialog { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; }",
+      ".b3-dialog__scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); }",
+      ".b3-dialog__container { position: relative; background: #fff; border: 1px solid #e4e4e7; border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,0.2); display: flex; flex-direction: column; }",
+      ".b3-dialog__body { overflow: auto; flex: 1; display: flex; flex-direction: column; }",
+      ".fn__none { display: none !important; }",
     ].join("\n");
     document.head.prepend(style);
 
@@ -69,9 +82,15 @@ try {
         constructor(options) {
           registrations.dialogs += 1;
           this.element = document.createElement("div");
-          this.element.className = "b3-dialog";
           this.element.dataset.syntheticDialog = "true";
-          this.element.innerHTML = options.content;
+          this.element.innerHTML = `<div class="b3-dialog b3-dialog--open" style="z-index: 90">
+            <div class="b3-dialog__scrim"${options.transparent ? ' style="background-color:transparent"' : ""}></div>
+            <div role="dialog" aria-modal="true" tabindex="-1" class="b3-dialog__container" style="width:${options.width || "auto"};height:${options.height || "auto"}">
+              <svg class="b3-dialog__close${options.hideCloseIcon ? " fn__none" : ""}"></svg>
+              <div class="b3-dialog__header${options.title ? "" : " fn__none"}">${options.title || ""}</div>
+              <div class="b3-dialog__body">${options.content}</div>
+            </div>
+          </div>`;
           document.body.appendChild(this.element);
           this.destroyCallback = options.destroyCallback;
         }
@@ -191,6 +210,31 @@ try {
     delete document.documentElement.dataset.themeMode;
   });
 
+  // Verify SettingsModal & TypePicker `input[type="search"]` box-sizing & bounds against SiYuan `input[type=search] { box-sizing: content-box }`
+  await page.getByRole("button", { name: "管理类型与阶段" }).click();
+  const settingsModal = page.locator('[data-budde-modal="true"]');
+  await expect(settingsModal).toBeVisible();
+  await settingsModal.getByRole("button", { name: "更换图标与配色" }).click();
+  const iconSearch = settingsModal.getByRole("searchbox", { name: "搜索图标" });
+  await expect(iconSearch).toBeVisible();
+  const searchMetrics = await iconSearch.evaluate((input) => {
+    const card = input.closest("[data-type-picker]").parentElement;
+    const ir = input.getBoundingClientRect();
+    const cr = card.getBoundingClientRect();
+    return {
+      boxSizing: getComputedStyle(input).boxSizing,
+      height: ir.height,
+      overflowRight: ir.right - cr.right,
+      overflowLeft: cr.left - ir.left,
+    };
+  });
+  expect(searchMetrics.boxSizing).toBe("border-box");
+  expect(Math.abs(searchMetrics.height - 36)).toBeLessThanOrEqual(1);
+  expect(searchMetrics.overflowRight).toBeLessThanOrEqual(0);
+  expect(searchMetrics.overflowLeft).toBeLessThanOrEqual(0);
+  await settingsModal.getByRole("button", { name: "关闭设置" }).click();
+  await expect(settingsModal).toHaveCount(0);
+
   // Verify clicking card opens DetailPanel
   await page.locator(".card-open", { hasText: "构建产物页签初始化" }).click();
   await expect(page.locator(".detail-pane")).toBeVisible();
@@ -222,7 +266,7 @@ try {
   const qcInput = page.locator('[data-part="quick-capture-input"]');
   await expect(qcInput).toBeVisible();
   const qcFilledIcons = await page
-    .locator('[data-synthetic-dialog="true"] svg')
+    .locator('[data-synthetic-dialog="true"] .budde svg')
     .evaluateAll((nodes) =>
       nodes.filter(
         (svg) =>

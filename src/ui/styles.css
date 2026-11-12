@@ -8,6 +8,7 @@
   isolation: isolate;
   container-type: inline-size;
   container-name: budde;
+  box-sizing: border-box !important;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -22,6 +23,8 @@
   line-height: 1.5;
   font-weight: 400;
   text-align: left;
+  word-break: normal;
+  overflow-wrap: break-word;
   scrollbar-color: rgb(var(--bd-border)) transparent;
   scrollbar-width: thin;
 }
@@ -33,47 +36,65 @@
 .budde *,
 .budde *::before,
 .budde *::after {
-  box-sizing: border-box;
+  box-sizing: border-box !important;
   border-width: 0;
   border-style: solid;
   border-color: rgb(var(--bd-border));
 }
-.budde :where(h1, h2, h3, h4, p, ol, ul, fieldset) {
+.budde :is(h1, h2, h3, h4, h5, h6, p, ol, ul, dl, dd, blockquote, fieldset) {
   margin: 0;
 }
-.budde :where(h1, h2, h3, h4) {
+.budde :is(h1, h2, h3, h4, h5, h6) {
   font-size: inherit;
   font-weight: inherit;
 }
-.budde :where(ol, ul, fieldset) {
+.budde :is(ol, ul, fieldset) {
   padding: 0;
 }
-.budde :where(ol, ul) {
+.budde :is(ol, ul) {
   list-style: none;
 }
-.budde :where(fieldset) {
+.budde :is(fieldset) {
   min-width: 0;
 }
-.budde :where(button, input, textarea, select) {
+.budde :is(a) {
+  color: inherit;
+  text-decoration: inherit;
+}
+.budde :is(button, input, textarea, select) {
   margin: 0;
   font: inherit;
   color: inherit;
   letter-spacing: inherit;
 }
-.budde :where(button) {
+.budde :is(button) {
   appearance: none;
-  background: transparent;
+  background-color: transparent;
   text-transform: none;
   cursor: pointer;
 }
-.budde :where(button:disabled) {
+.budde button:where(:disabled) {
   cursor: default;
 }
-.budde :where(input, textarea, select) {
+.budde :is(input, textarea, select) {
   max-width: 100%;
   min-width: 0;
 }
-.budde :where(textarea) {
+/* SiYuan's global `input[type=search] { box-sizing: content-box }` has specificity (0,1,1),
+ * which beats `.budde *` (0,1,0) unless explicitly neutralized. */
+.budde input[type="search"] {
+  box-sizing: border-box !important;
+  appearance: textfield;
+  -webkit-appearance: textfield;
+}
+.budde input[type="search"]::-webkit-search-decoration,
+.budde input[type="search"]::-webkit-search-cancel-button,
+.budde input[type="search"]::-webkit-search-results-button,
+.budde input[type="search"]::-webkit-search-results-decoration {
+  appearance: none;
+  -webkit-appearance: none;
+}
+.budde :is(textarea) {
   resize: vertical;
 }
 .budde select {
@@ -105,17 +126,20 @@
   opacity: 1;
   color: rgb(var(--bd-muted-foreground));
 }
-.budde :where(*)::-webkit-scrollbar {
+.budde ::-webkit-scrollbar {
   width: 7px;
   height: 7px;
 }
-.budde :where(*)::-webkit-scrollbar-thumb {
+.budde ::-webkit-scrollbar-thumb,
+.budde ::-webkit-scrollbar-thumb:hover {
+  box-sizing: border-box;
   border: 2px solid transparent;
   border-radius: 8px;
   background: rgb(var(--bd-border));
   background-clip: padding-box;
+  box-shadow: none;
 }
-.budde :where(*)::-webkit-scrollbar-corner {
+.budde ::-webkit-scrollbar-corner {
   background: transparent;
 }
 @keyframes budde-toast-in {

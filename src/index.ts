@@ -189,7 +189,6 @@ export default class BuddePlugin extends Plugin {
     this.quickCaptureDialog?.destroy();
     let mounted: { destroy(): void } | undefined;
     const dialog = new Dialog({
-      transparent: true,
       width: "520px",
       hideCloseIcon: true,
       content: '<div class="budde-quick-capture-host"></div>',
@@ -201,6 +200,16 @@ export default class BuddePlugin extends Plugin {
       },
     });
     this.quickCaptureDialog = dialog;
+    const containerEl = dialog.element.querySelector<HTMLElement>(".b3-dialog__container");
+    if (containerEl) {
+      containerEl.style.background = "transparent";
+      containerEl.style.border = "none";
+      containerEl.style.boxShadow = "none";
+    }
+    const bodyEl = dialog.element.querySelector<HTMLElement>(".b3-dialog__body");
+    if (bodyEl) {
+      bodyEl.style.overflow = "visible";
+    }
     const hostEl = dialog.element.querySelector<HTMLElement>(".budde-quick-capture-host");
     if (!hostEl) return;
 
