@@ -7,6 +7,7 @@ import {
   selectArchiveItems,
   selectPoolItems,
   type ActiveFocus,
+  type CollectionLayout,
   type SortMode,
   type ViewFilters,
   type ViewMode,
@@ -16,6 +17,7 @@ import { usePane } from "./pane-context";
 import { BoardView } from "./board-view";
 import { DetailPanel } from "./detail-panel";
 import { ItemCard, type ItemCardActions } from "./item-card";
+import { ItemListView } from "./item-list";
 import { SettingsModal, type SettingsOpenRequest } from "./settings-modal";
 import { Icon } from "./components/icons";
 import { Button } from "./components/ui/button";
@@ -40,6 +42,24 @@ export function WorkbenchApp() {
   const [capturing, setCapturing] = useState(false);
   const [selectedId, setSelectedId] = useState<string>("");
   const [settingsRequest, setSettingsRequest] = useState<SettingsOpenRequest | null>(null);
+  const [layoutMode, setLayoutMode] = useState<CollectionLayout>(() => {
+    try {
+      return window.localStorage.getItem("budde:collection-layout") === "list"
+        ? "list"
+        : "grid";
+    } catch {
+      return "grid";
+    }
+  });
+
+  const handleLayoutModeChange = (next: CollectionLayout) => {
+    setLayoutMode(next);
+    try {
+      window.localStorage.setItem("budde:collection-layout", next);
+    } catch {
+      // Ignore storage access errors in restricted webviews.
+    }
+  };
 
   const [filters, setFilters] = useState<ViewFilters>({
     query: "",
@@ -384,7 +404,13 @@ export function WorkbenchApp() {
                 );
                 if (res.ok) {
                   setSelectedId("");
-                  setFilters((prev) => ({ ...prev, query: "", typeId: "", activeFocus: "all" }));
+                  setFilters((prev) => ({
+                    ...prev,
+                    query: "",
+                    typeId: "",
+                    includeActiveInPool: false,
+                    activeFocus: "all",
+                  }));
                 }
               }}
             >
@@ -571,6 +597,8 @@ export function WorkbenchApp() {
               state={state}
               filters={filters}
               onFiltersChange={(patch) => setFilters((prev) => ({ ...prev, ...patch }))}
+              layoutMode={layoutMode}
+              onLayoutModeChange={handleLayoutModeChange}
               selectedId={selectedId}
               cardActions={cardActions}
               onFocusCapture={() => captureInputRef.current?.focus()}
@@ -581,6 +609,8 @@ export function WorkbenchApp() {
               counts={counts}
               filters={filters}
               onFiltersChange={(patch) => setFilters((prev) => ({ ...prev, ...patch }))}
+              layoutMode={layoutMode}
+              onLayoutModeChange={handleLayoutModeChange}
               selectedId={selectedId}
               cardActions={cardActions}
               onGoPool={() => handleSwitchView("pool")}
@@ -590,6 +620,8 @@ export function WorkbenchApp() {
               state={state}
               filters={filters}
               onFiltersChange={(patch) => setFilters((prev) => ({ ...prev, ...patch }))}
+              layoutMode={layoutMode}
+              onLayoutModeChange={handleLayoutModeChange}
               selectedId={selectedId}
               cardActions={cardActions}
             />
@@ -617,6 +649,8 @@ function PoolCollectionView({
   state,
   filters,
   onFiltersChange,
+  layoutMode,
+  onLayoutModeChange,
   selectedId,
   cardActions,
   onFocusCapture,
@@ -624,6 +658,8 @@ function PoolCollectionView({
   state: BuddeState;
   filters: ViewFilters;
   onFiltersChange(patch: Partial<ViewFilters>): void;
+  layoutMode: CollectionLayout;
+  onLayoutModeChange(mode: CollectionLayout): void;
   selectedId: string;
   cardActions: ItemCardActions;
   onFocusCapture(): void;
@@ -656,22 +692,35 @@ function PoolCollectionView({
           state={state}
           filters={filters}
           onFiltersChange={onFiltersChange}
+          layoutMode={layoutMode}
+          onLayoutModeChange={onLayoutModeChange}
         />
       </div>
 
       <div data-part="collection" className="bd-min-h-0 bd-flex-1 bd-overflow-y-auto bd-p-0.5">
         {items.length > 0 ? (
-          <div className="bd-grid bd-grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] bd-items-start bd-gap-2.5">
-            {items.map((item: Item) => (
-              <ItemCard
-                key={item.id}
-                state={state}
-                item={item}
-                selected={selectedId === item.id}
-                actions={cardActions}
-              />
-            ))}
-          </div>
+          layoutMode === "list" ? (
+            <ItemListView
+              state={state}
+              items={items}
+              selectedId={selectedId}
+              filters={filters}
+              onFiltersChange={onFiltersChange}
+              actions={cardActions}
+            />
+          ) : (
+            <div className="bd-grid bd-grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] bd-items-stretch bd-gap-2.5">
+              {items.map((item: Item) => (
+                <ItemCard
+                  key={item.id}
+                  state={state}
+                  item={item}
+                  selected={selectedId === item.id}
+                  actions={cardActions}
+                />
+              ))}
+            </div>
+          )
         ) : (
           <EmptyCollectionState
             icon="pool"
@@ -698,6 +747,8 @@ function ActiveCollectionView({
   counts,
   filters,
   onFiltersChange,
+  layoutMode,
+  onLayoutModeChange,
   selectedId,
   cardActions,
   onGoPool,
@@ -706,6 +757,8 @@ function ActiveCollectionView({
   counts: ReturnType<typeof getWorkspaceCounts>;
   filters: ViewFilters;
   onFiltersChange(patch: Partial<ViewFilters>): void;
+  layoutMode: CollectionLayout;
+  onLayoutModeChange(mode: CollectionLayout): void;
   selectedId: string;
   cardActions: ItemCardActions;
   onGoPool(): void;
@@ -745,23 +798,36 @@ function ActiveCollectionView({
           state={state}
           filters={filters}
           onFiltersChange={onFiltersChange}
+          layoutMode={layoutMode}
+          onLayoutModeChange={onLayoutModeChange}
           showReviewSort
         />
       </div>
 
       <div data-part="collection" className="bd-min-h-0 bd-flex-1 bd-overflow-y-auto bd-p-0.5">
         {items.length > 0 ? (
-          <div className="bd-grid bd-grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] bd-items-start bd-gap-2.5">
-            {items.map((item) => (
-              <ItemCard
-                key={item.id}
-                state={state}
-                item={item}
-                selected={selectedId === item.id}
-                actions={cardActions}
-              />
-            ))}
-          </div>
+          layoutMode === "list" ? (
+            <ItemListView
+              state={state}
+              items={items}
+              selectedId={selectedId}
+              filters={filters}
+              onFiltersChange={onFiltersChange}
+              actions={cardActions}
+            />
+          ) : (
+            <div className="bd-grid bd-grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] bd-items-stretch bd-gap-2.5">
+              {items.map((item) => (
+                <ItemCard
+                  key={item.id}
+                  state={state}
+                  item={item}
+                  selected={selectedId === item.id}
+                  actions={cardActions}
+                />
+              ))}
+            </div>
+          )
         ) : (
           <EmptyCollectionState
             icon="active"
@@ -788,12 +854,16 @@ function ArchiveCollectionView({
   state,
   filters,
   onFiltersChange,
+  layoutMode,
+  onLayoutModeChange,
   selectedId,
   cardActions,
 }: {
   state: BuddeState;
   filters: ViewFilters;
   onFiltersChange(patch: Partial<ViewFilters>): void;
+  layoutMode: CollectionLayout;
+  onLayoutModeChange(mode: CollectionLayout): void;
   selectedId: string;
   cardActions: ItemCardActions;
 }) {
@@ -816,6 +886,8 @@ function ArchiveCollectionView({
             state={state}
             filters={filters}
             onFiltersChange={onFiltersChange}
+            layoutMode={layoutMode}
+            onLayoutModeChange={onLayoutModeChange}
           />
           {totalArchived > 0 && (
             <Button
@@ -848,17 +920,28 @@ function ArchiveCollectionView({
 
       <div data-part="collection" className="bd-min-h-0 bd-flex-1 bd-overflow-y-auto bd-p-0.5">
         {items.length > 0 ? (
-          <div className="bd-grid bd-grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] bd-items-start bd-gap-2.5">
-            {items.map((item) => (
-              <ItemCard
-                key={item.id}
-                state={state}
-                item={item}
-                selected={selectedId === item.id}
-                actions={cardActions}
-              />
-            ))}
-          </div>
+          layoutMode === "list" ? (
+            <ItemListView
+              state={state}
+              items={items}
+              selectedId={selectedId}
+              filters={filters}
+              onFiltersChange={onFiltersChange}
+              actions={cardActions}
+            />
+          ) : (
+            <div className="bd-grid bd-grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] bd-items-stretch bd-gap-2.5">
+              {items.map((item) => (
+                <ItemCard
+                  key={item.id}
+                  state={state}
+                  item={item}
+                  selected={selectedId === item.id}
+                  actions={cardActions}
+                />
+              ))}
+            </div>
+          )
         ) : (
           <EmptyCollectionState
             icon="archive"
@@ -875,11 +958,15 @@ function FilterToolbar({
   state,
   filters,
   onFiltersChange,
+  layoutMode,
+  onLayoutModeChange,
   showReviewSort = false,
 }: {
   state: BuddeState;
   filters: ViewFilters;
   onFiltersChange(patch: Partial<ViewFilters>): void;
+  layoutMode: CollectionLayout;
+  onLayoutModeChange(mode: CollectionLayout): void;
   showReviewSort?: boolean;
 }) {
   return (
@@ -903,7 +990,7 @@ function FilterToolbar({
         aria-label="按类型筛选"
         value={filters.typeId}
         onChange={(e) => onFiltersChange({ typeId: e.target.value })}
-        className="bd-h-8 bd-w-28 bd-text-xs [@container(max-width:520px)]:bd-flex-1"
+        className="bd-h-8 bd-w-28 bd-text-xs [@container(max-width:520px)]:bd-min-w-0 [@container(max-width:520px)]:bd-flex-1"
       >
         <option value="">所有类型</option>
         {state.types.map((t) => (
@@ -916,14 +1003,51 @@ function FilterToolbar({
       <NativeSelect
         aria-label="排序方式"
         value={filters.sort}
-        onChange={(e) => onFiltersChange({ sort: e.target.value as SortMode })}
-        className="bd-h-8 bd-w-32 bd-text-xs [@container(max-width:520px)]:bd-flex-1"
+        onChange={(e) =>
+          onFiltersChange({ sort: e.target.value as SortMode, sortAsc: undefined })
+        }
+        className="bd-h-8 bd-w-32 bd-text-xs [@container(max-width:520px)]:bd-min-w-0 [@container(max-width:520px)]:bd-flex-1"
       >
         <option value="manual">置顶与默认</option>
         <option value="updated">最近更新</option>
         <option value="created">最近创建</option>
+        <option value="type">按类型分组</option>
+        <option value="title">按标题排序</option>
         {showReviewSort && <option value="review">待复查优先</option>}
       </NativeSelect>
+
+      <div
+        role="group"
+        aria-label="视图布局"
+        className="bd-inline-flex bd-h-8 bd-shrink-0 bd-items-center bd-rounded-md bd-border bd-border-input bd-bg-background bd-p-0.5"
+      >
+        <button
+          type="button"
+          aria-label="卡片视图"
+          title="卡片视图"
+          aria-pressed={layoutMode === "grid"}
+          onClick={() => onLayoutModeChange("grid")}
+          className={cn(
+            "bd-inline-flex bd-h-full bd-w-7 bd-items-center bd-justify-center bd-rounded-sm bd-text-muted-foreground bd-transition-colors hover:bd-text-foreground focus-visible:bd-outline-none focus-visible:bd-ring-2 focus-visible:bd-ring-ring",
+            layoutMode === "grid" && "bd-bg-card bd-text-foreground bd-shadow-xs",
+          )}
+        >
+          <Icon name="grid" />
+        </button>
+        <button
+          type="button"
+          aria-label="列表视图"
+          title="列表视图"
+          aria-pressed={layoutMode === "list"}
+          onClick={() => onLayoutModeChange("list")}
+          className={cn(
+            "bd-inline-flex bd-h-full bd-w-7 bd-items-center bd-justify-center bd-rounded-sm bd-text-muted-foreground bd-transition-colors hover:bd-text-foreground focus-visible:bd-outline-none focus-visible:bd-ring-2 focus-visible:bd-ring-ring",
+            layoutMode === "list" && "bd-bg-card bd-text-foreground bd-shadow-xs",
+          )}
+        >
+          <Icon name="list" />
+        </button>
+      </div>
     </div>
   );
 }

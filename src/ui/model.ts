@@ -2,8 +2,9 @@ import type { BuddeState, Command, Item, ItemType, NoteLink } from "../core/type
 import { DEFAULT_REVIEW_DAYS } from "../core/type-config";
 
 export type ViewMode = "pool" | "active" | "board" | "archive";
+export type CollectionLayout = "grid" | "list";
 export type ActiveFocus = "all" | "review" | "paused" | "completed";
-export type SortMode = "manual" | "updated" | "created" | "review";
+export type SortMode = "manual" | "updated" | "created" | "review" | "type" | "title";
 
 export interface ViewFilters {
   query: string;
@@ -12,6 +13,11 @@ export interface ViewFilters {
   activeFocus: ActiveFocus;
   hidePausedOnBoard: boolean;
   sort: SortMode;
+  sortAsc?: boolean;
+}
+
+export function defaultSortAsc(mode: SortMode): boolean {
+  return mode !== "updated" && mode !== "created";
 }
 
 export function getItemType(state: BuddeState, item: Item): ItemType | undefined {
@@ -57,14 +63,34 @@ export function sortItems(
   items: Item[],
   mode: SortMode = "manual",
   now = new Date().toISOString(),
+  sortAsc?: boolean,
 ): Item[] {
+  const asc = sortAsc ?? defaultSortAsc(mode);
+  const typeIndex = new Map(state.types.map((type, index) => [type.id, index]));
+
   return [...items].sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
     if (mode === "updated") {
-      return b.updatedAt.localeCompare(a.updatedAt) || a.order - b.order;
+      const cmp = asc
+        ? a.updatedAt.localeCompare(b.updatedAt)
+        : b.updatedAt.localeCompare(a.updatedAt);
+      return cmp || a.order - b.order;
     }
     if (mode === "created") {
-      return b.createdAt.localeCompare(a.createdAt) || a.order - b.order;
+      const cmp = asc
+        ? a.createdAt.localeCompare(b.createdAt)
+        : b.createdAt.localeCompare(a.createdAt);
+      return cmp || a.order - b.order;
+    }
+    if (mode === "type") {
+      const ta = typeIndex.get(a.typeId) ?? Number.MAX_SAFE_INTEGER;
+      const tb = typeIndex.get(b.typeId) ?? Number.MAX_SAFE_INTEGER;
+      const cmp = asc ? ta - tb : tb - ta;
+      return cmp || a.order - b.order || b.updatedAt.localeCompare(a.updatedAt);
+    }
+    if (mode === "title") {
+      const cmp = a.title.localeCompare(b.title, "zh-CN", { numeric: true });
+      return (asc ? cmp : -cmp) || a.order - b.order;
     }
     if (mode === "review") {
       const ra = needsReview(state, a, now);
@@ -72,15 +98,17 @@ export function sortItems(
       if (ra !== rb) return ra ? -1 : 1;
       const aa = a.reviewedAt ?? a.updatedAt;
       const ab = b.reviewedAt ?? b.updatedAt;
-      return aa.localeCompare(ab) || a.order - b.order;
+      const cmp = asc ? aa.localeCompare(ab) : ab.localeCompare(aa);
+      return cmp || a.order - b.order;
     }
-    return a.order - b.order || b.createdAt.localeCompare(a.createdAt);
+    const manualCmp = a.order - b.order || b.createdAt.localeCompare(a.createdAt);
+    return asc ? manualCmp : -manualCmp;
   });
 }
 
 export function selectPoolItems(
   state: BuddeState,
-  filters: Pick<ViewFilters, "query" | "typeId" | "includeActiveInPool" | "sort">,
+  filters: Pick<ViewFilters, "query" | "typeId" | "includeActiveInPool" | "sort" | "sortAsc">,
   now?: string,
 ): Item[] {
   const matched = state.items.filter((item) => {
@@ -89,12 +117,12 @@ export function selectPoolItems(
     if (filters.typeId && item.typeId !== filters.typeId) return false;
     return matchesQuery(item, filters.query);
   });
-  return sortItems(state, matched, filters.sort, now);
+  return sortItems(state, matched, filters.sort, now, filters.sortAsc);
 }
 
 export function selectActiveItems(
   state: BuddeState,
-  filters: Pick<ViewFilters, "query" | "typeId" | "activeFocus" | "sort">,
+  filters: Pick<ViewFilters, "query" | "typeId" | "activeFocus" | "sort" | "sortAsc">,
   now = new Date().toISOString(),
 ): Item[] {
   const matched = state.items.filter((item) => {
@@ -115,7 +143,7 @@ export function selectActiveItems(
         return item.status === "active" && !completed;
     }
   });
-  return sortItems(state, matched, filters.sort, now);
+  return sortItems(state, matched, filters.sort, now, filters.sortAsc);
 }
 
 export function selectBoardItems(
@@ -134,7 +162,7 @@ export function selectBoardItems(
 
 export function selectArchiveItems(
   state: BuddeState,
-  filters: Pick<ViewFilters, "query" | "typeId" | "sort">,
+  filters: Pick<ViewFilters, "query" | "typeId" | "sort" | "sortAsc">,
   now?: string,
 ): Item[] {
   const matched = state.items.filter((item) => {
@@ -142,7 +170,8 @@ export function selectArchiveItems(
     if (filters.typeId && item.typeId !== filters.typeId) return false;
     return matchesQuery(item, filters.query);
   });
-  return sortItems(state, matched, filters.sort === "manual" ? "updated" : filters.sort, now);
+  const effectiveSort = filters.sort === "manual" ? "updated" : filters.sort;
+  return sortItems(state, matched, effectiveSort, now, filters.sortAsc);
 }
 
 export function getWorkspaceCounts(state: BuddeState, now = new Date().toISOString()) {

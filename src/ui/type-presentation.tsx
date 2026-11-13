@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useState, type CSSProperties } from "react";
 import {
   Shapes,
   FileText,
@@ -99,6 +99,15 @@ export const COLOR_LABELS: Record<TypeColor, string> = {
 export const typeTint = (color?: string) =>
   color && color !== "default" ? `rgb(var(--bd-type-${color}))` : undefined;
 
+export const typeBadgeStyle = (color?: string): CSSProperties | undefined =>
+  color && color !== "default"
+    ? {
+        color: `rgb(var(--bd-type-${color}))`,
+        backgroundColor: `rgb(var(--bd-type-${color}) / 0.11)`,
+        borderColor: `rgb(var(--bd-type-${color}) / 0.26)`,
+      }
+    : undefined;
+
 export function TypeIcon({
   type,
   className = "",
@@ -132,6 +141,29 @@ export function TypeIcon({
       ) : (
         value
       )}
+    </span>
+  );
+}
+
+export function TypeBadge({
+  type,
+  className = "",
+}: {
+  type: Pick<ItemType, "name" | "icon" | "color">;
+  className?: string;
+}) {
+  const tinted = Boolean(type.color && type.color !== "default");
+  return (
+    <span
+      data-type-badge
+      data-color={type.color || "default"}
+      style={typeBadgeStyle(type.color)}
+      className={`bd-inline-flex bd-max-w-full bd-items-center bd-gap-1 bd-rounded-md bd-border bd-px-1.5 bd-py-0.5 bd-text-xs bd-font-medium bd-leading-4 ${
+        tinted ? "" : "bd-border-border bd-bg-muted/75 bd-text-muted-foreground"
+      } ${className}`.trim()}
+    >
+      <TypeIcon type={type} />
+      <span className="bd-truncate">{type.name}</span>
     </span>
   );
 }
@@ -171,20 +203,15 @@ export function TypePicker({
   return (
     <section data-type-picker className="bd-min-w-0 bd-space-y-3" aria-label="类型外观">
       <div className="bd-flex bd-flex-wrap bd-items-center bd-justify-between bd-gap-2">
-        <div
-          data-type-preview
-          data-color={color || "default"}
-          className="bd-inline-flex bd-items-center bd-gap-2 bd-rounded-md bd-border bd-border-border bd-bg-background bd-px-3 bd-py-1.5"
-        >
-          <TypeIcon
+        <div data-type-preview data-color={color || "default"} className="bd-min-w-0">
+          <TypeBadge
             type={{
+              name: name || "类型预览",
               icon: icon || undefined,
               color: color ? (color as TypeColor) : undefined,
             }}
+            className="bd-max-w-52 bd-px-2.5 bd-py-1 bd-text-control"
           />
-          <span className="bd-max-w-48 bd-truncate bd-text-control bd-font-medium">
-            {name || "类型预览"}
-          </span>
         </div>
         <div className="bd-flex bd-items-center bd-gap-1.5" role="group" aria-label="柔和配色">
           {TYPE_COLORS.map((value) => (

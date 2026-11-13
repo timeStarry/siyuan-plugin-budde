@@ -45,8 +45,14 @@ try {
   await expect(page.locator('[data-view="pool"]')).toContainText("2");
   await expect(page.locator('[data-view="active"]')).toContainText("1");
 
-  // Promote one Pool item directly from Pool card
+  // Promote one Pool item directly from Pool card (hover reveals top-right quick actions without changing card height)
   const shortcutCard = page.locator(".item-card", { hasText: "支持快捷键一键捕获想法" });
+  const preHoverHeight = await shortcutCard.evaluate((el) => el.getBoundingClientRect().height);
+  await shortcutCard.hover();
+  const postHoverHeight = await shortcutCard.evaluate((el) => el.getBoundingClientRect().height);
+  expect(postHoverHeight).toBe(preHoverHeight);
+  await expect(shortcutCard.locator("[data-type-badge]")).toBeVisible();
+  await expect(shortcutCard.getByRole("button", { name: "展开详情" })).toHaveCount(0);
   await shortcutCard.getByRole("button", { name: "开始推进" }).click();
   await expect(page.locator(".budde-toast", { hasText: "已开始推进" })).toBeVisible();
   await expect(page.locator('[data-view="pool"]')).toContainText("1");
@@ -206,13 +212,48 @@ try {
   expect(hasHorizontalOverflow).toBe(false);
   await page.screenshot({ path: `${qaDir}/narrow-360.png`, animations: "disabled" });
 
-  // 9. Overflow menu: reset to default demo & clear all items
+  // 9. Overflow menu: reset to default demo, verify equal-height row cards + sortable List View, & clear all items
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole("button", { name: "数据与更多操作" }).click();
   await page.getByRole("menuitem", { name: "重置为默认示例…" }).click();
   await page.locator('[data-budde-modal="true"]').getByRole("button", { name: "确认重置示例" }).click();
   await expect(page.locator('[data-view="pool"]')).toContainText("3");
   await expect(page.locator('[data-view="active"]')).toContainText("2");
+
+  // Verify same-row Pool cards stretch to equal height even when descriptions differ
+  const rowCardHeights = await page.locator(".item-card").evaluateAll((cards) => {
+    const firstTop = Math.round(cards[0].getBoundingClientRect().top);
+    return cards
+      .filter((c) => Math.abs(Math.round(c.getBoundingClientRect().top) - firstTop) <= 2)
+      .map((c) => Math.round(c.getBoundingClientRect().height));
+  });
+  expect(rowCardHeights.length).toBeGreaterThanOrEqual(2);
+  expect(new Set(rowCardHeights).size).toBe(1);
+
+  // Switch to List View, verify 42px row density, column sorting, and 360px narrow container layout
+  await page.getByRole("button", { name: "列表视图" }).click();
+  await expect(page.locator('[data-list-view="true"]')).toBeVisible();
+  const listRowHeights = await page
+    .locator("[data-list-row]")
+    .evaluateAll((rows) => rows.map((r) => Math.round(r.getBoundingClientRect().height)));
+  expect(listRowHeights.length).toBe(3);
+  for (const h of listRowHeights) {
+    expect(h).toBe(42);
+  }
+  await page.getByRole("button", { name: "按类型排序" }).click();
+  await expect(page.getByRole("button", { name: "按类型排序" }).locator('[data-icon="sortAsc"]')).toBeVisible();
+  await page.getByRole("button", { name: "按类型排序" }).click();
+  await expect(page.getByRole("button", { name: "按类型排序" }).locator('[data-icon="sortDesc"]')).toBeVisible();
+
+  await page.setViewportSize({ width: 360, height: 740 });
+  const listNarrowOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(listNarrowOverflow).toBe(false);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole("button", { name: "卡片视图" }).click();
+  await expect(page.locator('[data-list-view="true"]')).toHaveCount(0);
 
   await page.getByRole("button", { name: "数据与更多操作" }).click();
   await page.getByRole("menuitem", { name: "清空全部事项…" }).click();

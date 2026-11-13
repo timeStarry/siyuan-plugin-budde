@@ -1,8 +1,10 @@
 import {
   AlertCircle,
   Archive,
+  ArrowDown,
   ArrowLeft,
   ArrowRight,
+  ArrowUp,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -18,7 +20,9 @@ import {
   GripVertical,
   Inbox,
   Kanban,
+  LayoutGrid,
   Link,
+  List,
   MoreHorizontal,
   Pause,
   Pencil,
@@ -78,6 +82,10 @@ const icons = {
   refresh: RefreshCw,
   undo: RotateCcw,
   alert: AlertCircle,
+  grid: LayoutGrid,
+  list: List,
+  sortAsc: ArrowUp,
+  sortDesc: ArrowDown,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = "brand" | keyof typeof icons;
