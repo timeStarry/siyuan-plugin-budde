@@ -207,6 +207,73 @@ export class SiYuanNotes implements NoteBridge {
     return map;
   }
 
+  async readDocMarkdown(
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<{ id: string; title: string; markdown: string }> {
+    const validId = parseNoteId(id);
+    const data = await this.postJson<{ hPath?: string; content?: string }>(
+      "/api/export/exportMdContent",
+      { id: validId },
+      signal,
+    );
+    const markdown = typeof data?.content === "string" ? data.content : "";
+    const leaf = data?.hPath?.split("/").filter(Boolean).at(-1)?.trim();
+    return {
+      id: validId,
+      title: leaf || validId,
+      markdown,
+    };
+  }
+
+  async getDocHeadings(
+    docId: string,
+    signal?: AbortSignal,
+  ): Promise<Array<{ id: string; content: string }>> {
+    const validId = parseNoteId(docId);
+    const normalizeHeading = (raw?: string) =>
+      String(raw ?? "")
+        .replace(/<[^>]*>/g, "")
+        .replace(/^#+\s*/, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    try {
+      const children =
+        (await this.postJson<Array<{ id?: string; type?: string; content?: string }>>(
+          "/api/block/getChildBlocks",
+          { id: validId },
+          signal,
+        )) ?? [];
+      const childHeadings = children
+        .filter((row) => row.type === "h" && typeof row.id === "string" && tryParseNoteId(row.id))
+        .map((row) => ({
+          id: row.id as string,
+          content: normalizeHeading(row.content),
+        }))
+        .filter((h) => Boolean(h.content));
+      if (childHeadings.length > 0) return childHeadings;
+    } catch {
+      // Fall back to SQL query if getChildBlocks is unavailable in this host build.
+    }
+
+    const rows =
+      (await this.postJson<Array<{ id?: string; content?: string }>>(
+        "/api/query/sql",
+        {
+          stmt: `SELECT id, content FROM blocks WHERE root_id = '${validId}' AND type = 'h' ORDER BY sort ASC LIMIT 100`,
+        },
+        signal,
+      )) ?? [];
+    return rows
+      .filter((row) => typeof row.id === "string" && tryParseNoteId(row.id))
+      .map((row) => ({
+        id: row.id as string,
+        content: normalizeHeading(row.content),
+      }))
+      .filter((h) => Boolean(h.content));
+  }
+
   async open(target: string, signal?: AbortSignal): Promise<void> {
     if (signal?.aborted) return;
     const resolved = await this.resolve(target);

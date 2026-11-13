@@ -1,11 +1,29 @@
 import type { StageTemplateId, TypeColor } from "./type-config";
 
 export type ItemStatus = "pool" | "active" | "paused" | "archived";
+export type ItemPriority = "high" | "medium" | "low";
+
+export interface StageCriterion {
+  id: string;
+  text: string;
+}
+
+export interface CustomCriterion {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+export interface StageCriteriaProgress {
+  checkedIds?: string[];
+  custom?: CustomCriterion[];
+}
 
 export interface Stage {
   id: string;
   name: string;
   completed: boolean;
+  criteria?: StageCriterion[];
 }
 
 export interface ItemType {
@@ -17,6 +35,27 @@ export interface ItemType {
   color?: TypeColor;
   /** Days before an active, non-completed item prompts for review; null disables review reminder. */
   reviewDays?: number | null;
+  /** Optional Markdown blueprint used when creating a linked SiYuan outcome document. */
+  docTemplate?: string;
+}
+
+export interface TypePack {
+  product: "BuddeTypePack";
+  schemaVersion: 1;
+  exportedAt: string;
+  type: {
+    name: string;
+    icon?: string;
+    color?: TypeColor;
+    reviewDays?: number | null;
+    docTemplate?: string;
+    initialStageIndex: number;
+    stages: Array<{
+      name: string;
+      completed: boolean;
+      criteria?: string[];
+    }>;
+  };
 }
 
 export interface NoteLink {
@@ -25,6 +64,8 @@ export interface NoteLink {
   title: string;
   hpath?: string;
   role: "reference" | "outcome";
+  /** Optional stage binding for section heading anchors or per-stage documents. */
+  stageId?: string;
 }
 
 export interface Item {
@@ -33,11 +74,14 @@ export interface Item {
   typeId: string;
   stageId: string;
   status: ItemStatus;
+  priority?: ItemPriority;
   pinned: boolean;
   order: number;
   description: string;
   nextStep: string;
   links: NoteLink[];
+  /** Per-stage checklist progress: checked preset criterion IDs + item-specific criteria. */
+  criteriaState?: Record<string, StageCriteriaProgress>;
   createdAt: string;
   updatedAt: string;
   reviewedAt: string | null;
@@ -79,7 +123,10 @@ export type ItemPatch = Partial<
     | "links"
     | "reviewedAt"
   >
->;
+> & {
+  priority?: ItemPriority | null;
+  criteriaState?: Record<string, StageCriteriaProgress> | null;
+};
 
 export type Command =
   | {
@@ -89,6 +136,7 @@ export type Command =
       typeId?: string;
       status?: "pool" | "active";
       stageId?: string;
+      priority?: ItemPriority;
       description?: string;
       nextStep?: string;
       links?: NoteLink[];
@@ -144,7 +192,13 @@ export type Command =
       icon?: string | null;
       color?: TypeColor | null;
       reviewDays?: number | null;
+      docTemplate?: string | null;
       template?: StageTemplateId;
+    }
+  | {
+      kind: "type.import";
+      expectedRevision: number;
+      pack: TypePack;
     }
   | {
       kind: "type.update";
@@ -155,6 +209,7 @@ export type Command =
       icon?: string | null;
       color?: TypeColor | null;
       reviewDays?: number | null;
+      docTemplate?: string | null;
     }
   | {
       kind: "type.reorder";
@@ -173,6 +228,7 @@ export type Command =
       typeId: string;
       name: string;
       completed?: boolean;
+      criteria?: string[];
     }
   | {
       kind: "stage.update";
@@ -181,6 +237,7 @@ export type Command =
       id: string;
       name: string;
       completed: boolean;
+      criteria?: Array<{ id?: string; text: string }> | null;
     }
   | {
       kind: "stage.delete";
@@ -235,5 +292,13 @@ export interface NoteBridge {
     targets: string[],
     signal?: AbortSignal,
   ): Promise<Record<string, { title: string; hpath?: string }>>;
+  readDocMarkdown?(
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<{ id: string; title: string; markdown: string }>;
+  getDocHeadings?(
+    docId: string,
+    signal?: AbortSignal,
+  ): Promise<Array<{ id: string; content: string }>>;
   open(target: string, signal?: AbortSignal): Promise<void>;
 }

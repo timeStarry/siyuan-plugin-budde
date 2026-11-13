@@ -4,6 +4,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { BuddeService, MemoryStore, createInitialState, validateState } from "../src/core/service";
+import { createTypePack, normalizeHeadingForStageMatch, parseTypePack, renderDocTemplate } from "../src/core/template";
 import { NodeFileStore } from "../src/platform/node-file-store";
 import type { Command } from "../src/core/types";
 
@@ -178,4 +179,111 @@ test("NodeFileStore persists updates and hasChangedSince detects mtime changes w
   assert.equal(state.types[0].icon, "🌱");
   assert.equal(state.types[0].color, "rose");
   assert.equal(state.revision, 1);
+});
+
+test("docTemplate rendering, stage criteria ID preservation, criteriaState cleanup, and TypePack import/export", async () => {
+  const client = setup();
+  const s0 = await client.snapshot();
+  const projectType = s0.types.find((t) => t.id === "project")!;
+  assert.ok(projectType.docTemplate?.includes("{{title}}"));
+  assert.ok((projectType.stages[0].criteria?.length ?? 0) >= 1);
+
+  // Preserve existing criterion IDs on stage.update and add a new one
+  const stage0 = projectType.stages[0];
+  const preservedCriterion = stage0.criteria![0];
+  const updatedStageRes = await client.execute({
+    kind: "stage.update",
+    expectedRevision: s0.revision,
+    typeId: "project",
+    id: stage0.id,
+    name: stage0.name,
+    completed: stage0.completed,
+    criteria: [
+      { id: preservedCriterion.id, text: `${preservedCriterion.text}（补充）` },
+      { text: "新增检查项" },
+    ],
+  });
+  const updatedStage0 = updatedStageRes.state.types.find((t) => t.id === "project")!.stages[0];
+  assert.equal(updatedStage0.criteria![0].id, preservedCriterion.id);
+  assert.equal(updatedStage0.criteria!.length, 2);
+
+  // Update docTemplate via type.update and render placeholders
+  const tplRes = await client.execute({
+    kind: "type.update",
+    expectedRevision: updatedStageRes.state.revision,
+    id: "project",
+    name: "项目开发",
+    docTemplate: "# {{title}}\n\n类型：{{type}} / 阶段：{{stage}}\n\n{{description}}\n{{nextStep}}",
+  });
+  const created = await client.execute({
+    kind: "item.create",
+    requestId: "req-tpl-1",
+    title: "测试项目文档",
+    description: "核心说明",
+    nextStep: "先验证",
+    typeId: "project",
+    priority: "high",
+    status: "active",
+  });
+  const createdItem = created.state.items.find((i) => i.id === created.itemId)!;
+  assert.equal(createdItem.priority, "high");
+  const updatedProj = created.state.types.find((t) => t.id === "project")!;
+  const rendered = renderDocTemplate(updatedProj.docTemplate!, {
+    item: createdItem,
+    type: updatedProj,
+    stage: updatedProj.stages[1],
+    date: "2026-11-13",
+  });
+  assert.match(rendered, /# 测试项目文档/);
+  assert.match(rendered, /核心说明/);
+  assert.match(rendered, /先验证/);
+  assert.equal(normalizeHeadingForStageMatch("  设 想 "), normalizeHeadingForStageMatch("设想"));
+  assert.equal(normalizeHeadingForStageMatch("Phase One"), normalizeHeadingForStageMatch("phaseone"));
+
+  // Check criteria progress & stage-bound link, then verify cleanup when migrating typeId
+  const withCriteria = await client.execute({
+    kind: "item.update",
+    id: createdItem.id,
+    expectedVersion: createdItem.version,
+    patch: {
+      criteriaState: {
+        [updatedProj.stages[1].id]: {
+          checkedIds: [updatedProj.stages[1].criteria![0].id],
+          custom: [{ id: "custom-1", text: "自定义检查", done: false }],
+        },
+      },
+      links: [
+        {
+          id: "link-stage-1",
+          target: "siyuan://blocks/20261111120000-stage01",
+          title: "调研文档",
+          role: "outcome",
+          stageId: updatedProj.stages[1].id,
+        },
+      ],
+    },
+  });
+  const switchedType = await client.execute({
+    kind: "item.update",
+    id: createdItem.id,
+    expectedVersion: withCriteria.state.items.find((i) => i.id === createdItem.id)!.version,
+    patch: { typeId: "general" },
+  });
+  const migratedItem = switchedType.state.items.find((i) => i.id === createdItem.id)!;
+  assert.equal(migratedItem.criteriaState, undefined);
+  assert.equal(migratedItem.links[0].stageId, undefined);
+
+  // TypePack export / parse / import generates new type & stage IDs
+  const pack = createTypePack(tplRes.state.types.find((t) => t.id === "project")!, clock());
+  const parsed = parseTypePack(JSON.stringify(pack));
+  const imported = await client.execute({
+    kind: "type.import",
+    expectedRevision: switchedType.state.revision,
+    pack: parsed,
+  });
+  const newType = imported.state.types[imported.state.types.length - 1];
+  assert.notEqual(newType.id, "project");
+  assert.notEqual(newType.stages[0].id, projectType.stages[0].id);
+  assert.equal(newType.docTemplate, tplRes.state.types.find((t) => t.id === "project")!.docTemplate);
+  assert.throws(() => parseTypePack("{bad json"), /有效的 JSON/);
 });

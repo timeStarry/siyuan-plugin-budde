@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import type { BuddeState } from "../core/types";
+import { useEffect, useRef, useState } from "react";
+import type { BuddeState, NoteSummary } from "../core/types";
 import {
   DEFAULT_REVIEW_DAYS,
   REVIEW_DAY_PRESETS,
@@ -7,12 +7,19 @@ import {
   type StageTemplateId,
   type TypeColor,
 } from "../core/type-config";
+import { createTypePack, parseTypePack } from "../core/template";
 import { useBudde } from "./context";
 import { TypeIcon, TypePicker } from "./type-presentation";
 import { Modal } from "./components/ui/modal";
 import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
-import { FieldHelp, Input, Label, NativeSelect } from "./components/ui/fields";
+import {
+  FieldHelp,
+  Input,
+  Label,
+  NativeSelect,
+  Textarea,
+} from "./components/ui/fields";
 import { Icon } from "./components/icons";
 
 export interface SettingsOpenRequest {
@@ -32,7 +39,8 @@ export function SettingsModal({
   initialRequest?: SettingsOpenRequest | null;
   onClose(): void;
 }) {
-  const { execute } = useBudde();
+  const { execute, notes, toast } = useBudde();
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [activeTypeId, setActiveTypeId] = useState(
     initialRequest?.typeId ?? state.types[0]?.id ?? "",
   );
@@ -58,6 +66,15 @@ export function SettingsModal({
   const [editingStageId, setEditingStageId] = useState<string | null>(null);
   const [editingStageName, setEditingStageName] = useState("");
   const [addingStageName, setAddingStageName] = useState("");
+  const [criteriaStageId, setCriteriaStageId] = useState<string | null>(null);
+  const [newCriterionText, setNewCriterionText] = useState("");
+
+  // Type Markdown doc template states
+  const [templateDraft, setTemplateDraft] = useState(activeType?.docTemplate ?? "");
+  const [pickingTemplateDoc, setPickingTemplateDoc] = useState(false);
+  const [templateDocQuery, setTemplateDocQuery] = useState("");
+  const [templateDocResults, setTemplateDocResults] = useState<NoteSummary[]>([]);
+  const [loadingTemplateDoc, setLoadingTemplateDoc] = useState(false);
 
   // Delete type state
   const [confirmingDeleteType, setConfirmingDeleteType] = useState(false);
@@ -87,15 +104,49 @@ export function SettingsModal({
     }
     setConfirmingDeleteType(false);
     setEditingStageId(null);
+    setCriteriaStageId(null);
+    setNewCriterionText("");
+    setPickingTemplateDoc(false);
   }, [open, initialRequest]);
+
+  useEffect(() => {
+    setCriteriaStageId(null);
+    setNewCriterionText("");
+    setPickingTemplateDoc(false);
+  }, [activeType?.id]);
 
   useEffect(() => {
     if (activeType) {
       setTypeName(activeType.name);
+    }
+  }, [activeType?.id, activeType?.name]);
+
+  useEffect(() => {
+    if (activeType) {
+      setTemplateDraft(activeType.docTemplate ?? "");
+    }
+  }, [activeType?.id, activeType?.docTemplate]);
+
+  useEffect(() => {
+    if (activeType) {
       const otherType = state.types.find((t) => t.id !== activeType.id);
       setMigrateTypeTargetId(otherType?.id ?? "");
     }
-  }, [activeType?.id, activeType?.name, state.types]);
+  }, [activeType?.id, state.types]);
+
+  useEffect(() => {
+    if (!pickingTemplateDoc) return;
+    let cancelled = false;
+    const handle = window.setTimeout(() => {
+      void notes.search(templateDocQuery).then((hits) => {
+        if (!cancelled) setTemplateDocResults(hits.slice(0, 8));
+      });
+    }, 150);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [pickingTemplateDoc, templateDocQuery, notes]);
 
   const referencedItems = state.items.filter((i) => i.typeId === activeType.id);
 
@@ -134,6 +185,7 @@ export function SettingsModal({
                   setCreatingNew(false);
                   setActiveTypeId(entry.id);
                   setTypeName(entry.name);
+                  setTemplateDraft(entry.docTemplate ?? "");
                   setDeletingStageId(null);
                   setConfirmingDeleteType(false);
                 }}
@@ -188,18 +240,69 @@ export function SettingsModal({
             </div>
           ))}
 
-          <Button
-            size="sm"
-            variant={creatingNew ? "default" : "outline"}
-            onClick={() => {
-              setCreatingNew(true);
-              setNewName("");
-            }}
-            className="bd-mt-2 [@container(max-width:640px)]:bd-mt-0 [@container(max-width:640px)]:bd-shrink-0"
-          >
-            <Icon name="plus" />
-            新建类型
-          </Button>
+          <div className="bd-mt-2 bd-flex bd-flex-col bd-gap-1.5 [@container(max-width:640px)]:bd-mt-0 [@container(max-width:640px)]:bd-shrink-0 [@container(max-width:640px)]:bd-flex-row">
+            <Button
+              size="sm"
+              variant={creatingNew ? "default" : "outline"}
+              onClick={() => {
+                setCreatingNew(true);
+                setNewName("");
+              }}
+            >
+              <Icon name="plus" />
+              新建类型
+            </Button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="bd-hidden"
+              aria-label="导入类型包文件"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                void file
+                  .text()
+                  .then((text) => {
+                    const pack = parseTypePack(text);
+                    return execute(
+                      {
+                        kind: "type.import",
+                        pack,
+                        expectedRevision: state.revision,
+                      },
+                      { successMessage: `已导入类型「${pack.type.name}」` },
+                    );
+                  })
+                  .then((res) => {
+                    if (res.ok) {
+                      const imported = res.result.state.types[res.result.state.types.length - 1];
+                      if (imported) {
+                        setCreatingNew(false);
+                        setActiveTypeId(imported.id);
+                        setTypeName(imported.name);
+                        setTemplateDraft(imported.docTemplate ?? "");
+                      }
+                    }
+                  })
+                  .catch((err) => {
+                    toast(
+                      err instanceof Error ? err.message : "类型包导入失败",
+                      "error",
+                    );
+                  });
+              }}
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => importInputRef.current?.click()}
+            >
+              <Icon name="upload" />
+              导入类型…
+            </Button>
+          </div>
         </aside>
 
         <div className="bd-min-h-0 bd-space-y-5 bd-overflow-y-auto bd-p-5">
@@ -226,6 +329,7 @@ export function SettingsModal({
                   if (created) {
                     setActiveTypeId(created.id);
                     setTypeName(created.name);
+                    setTemplateDraft(created.docTemplate ?? "");
                   }
                 }
               }}
@@ -399,7 +503,7 @@ export function SettingsModal({
                   </div>
                 </div>
 
-                <div>
+                <div className="bd-flex bd-flex-wrap bd-items-center bd-gap-2">
                   <Button
                     size="sm"
                     variant="outline"
@@ -407,6 +511,30 @@ export function SettingsModal({
                   >
                     <TypeIcon type={activeType} />
                     {showAppearance ? "收起图标与配色设置" : "更换图标与配色"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const pack = createTypePack(activeType);
+                      const data = JSON.stringify(pack, null, 2);
+                      const blob = new Blob([data], { type: "application/json" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      const safeName =
+                        activeType.name.replace(/[^\p{L}\p{N}_-]+/gu, "-") || "type";
+                      a.download = `budde-type-${safeName}.json`;
+                      a.click();
+                      setTimeout(() => URL.revokeObjectURL(url), 100);
+                      toast(
+                        `已导出类型包「${activeType.name}」`,
+                        "success",
+                      );
+                    }}
+                  >
+                    <Icon name="download" />
+                    导出此类型
                   </Button>
                 </div>
 
@@ -455,6 +583,8 @@ export function SettingsModal({
                     );
                     const isDeleting = deletingStageId === stage.id;
                     const isEditing = editingStageId === stage.id;
+                    const stageCriteria = stage.criteria ?? [];
+                    const isCriteriaOpen = criteriaStageId === stage.id;
 
                     return (
                       <li key={stage.id} className="bd-space-y-2 bd-p-2.5">
@@ -536,6 +666,20 @@ export function SettingsModal({
                           )}
 
                           <div className="bd-flex bd-items-center bd-gap-1">
+                            <Button
+                              size="sm"
+                              variant={isCriteriaOpen ? "outline" : "ghost"}
+                              aria-pressed={isCriteriaOpen}
+                              aria-label={`准出项：${stage.name}`}
+                              onClick={() => {
+                                setCriteriaStageId(isCriteriaOpen ? null : stage.id);
+                                setNewCriterionText("");
+                              }}
+                              className="bd-h-7 bd-px-2 bd-text-xs bd-tabular-nums"
+                            >
+                              <Icon name="checklist" />
+                              准出项{stageCriteria.length > 0 ? ` (${stageCriteria.length})` : ""}
+                            </Button>
                             <Button
                               size="sm"
                               variant="ghost"
@@ -634,6 +778,97 @@ export function SettingsModal({
                           </div>
                         </div>
 
+                        {isCriteriaOpen && (
+                          <div className="bd-space-y-2 bd-rounded-md bd-border bd-border-border/80 bd-bg-muted/30 bd-p-2.5">
+                            <div className="bd-flex bd-items-center bd-justify-between bd-gap-2">
+                              <span className="bd-text-xs bd-font-medium bd-text-muted-foreground">
+                                「{stage.name}」建议准出检查项（仅提示，不阻止推进）
+                              </span>
+                            </div>
+                            {stageCriteria.length > 0 && (
+                              <ul className="bd-space-y-1">
+                                {stageCriteria.map((criterion) => (
+                                  <li
+                                    key={criterion.id}
+                                    className="bd-flex bd-items-center bd-justify-between bd-gap-2 bd-rounded bd-bg-background/80 bd-px-2 bd-py-1 bd-text-xs"
+                                  >
+                                    <span className="bd-min-w-0 bd-flex-1 bd-truncate">
+                                      {criterion.text}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      aria-label={`删除准出项：${criterion.text}`}
+                                      onClick={() => {
+                                        const nextCriteria = stageCriteria.filter(
+                                          (c) => c.id !== criterion.id,
+                                        );
+                                        void execute(
+                                          {
+                                            kind: "stage.update",
+                                            typeId: activeType.id,
+                                            id: stage.id,
+                                            name: stage.name,
+                                            completed: stage.completed,
+                                            criteria: nextCriteria.length > 0 ? nextCriteria : null,
+                                            expectedRevision: state.revision,
+                                          },
+                                          { successMessage: "已更新阶段准出项" },
+                                        );
+                                      }}
+                                      className="bd-flex bd-h-5 bd-w-5 bd-shrink-0 bd-items-center bd-justify-center bd-rounded bd-text-muted-foreground hover:bd-bg-muted hover:bd-text-foreground"
+                                    >
+                                      ×
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            <form
+                              className="bd-flex bd-items-center bd-gap-1.5"
+                              onSubmit={async (e) => {
+                                e.preventDefault();
+                                const text = newCriterionText.trim();
+                                if (!text) return;
+                                const nextCriteria = [
+                                  ...stageCriteria.map((c) => ({ id: c.id, text: c.text })),
+                                  { text },
+                                ];
+                                const res = await execute(
+                                  {
+                                    kind: "stage.update",
+                                    typeId: activeType.id,
+                                    id: stage.id,
+                                    name: stage.name,
+                                    completed: stage.completed,
+                                    criteria: nextCriteria,
+                                    expectedRevision: state.revision,
+                                  },
+                                  { successMessage: "已添加阶段准出项" },
+                                );
+                                if (res.ok) setNewCriterionText("");
+                              }}
+                            >
+                              <Input
+                                value={newCriterionText}
+                                maxLength={160}
+                                placeholder="输入阶段准出检查项，按回车添加…"
+                                aria-label={`新增「${stage.name}」准出检查项`}
+                                onChange={(e) => setNewCriterionText(e.target.value)}
+                                className="bd-h-7 bd-text-xs"
+                              />
+                              <Button
+                                type="submit"
+                                size="sm"
+                                variant="outline"
+                                disabled={!newCriterionText.trim()}
+                                className="bd-h-7 bd-shrink-0 bd-px-2.5 bd-text-xs"
+                              >
+                                添加
+                              </Button>
+                            </form>
+                          </div>
+                        )}
+
                         {isDeleting && (
                           <div className="bd-flex bd-flex-wrap bd-items-center bd-justify-between bd-gap-2 bd-rounded-md bd-border bd-border-destructive/30 bd-bg-destructive/5 bd-p-2.5 bd-text-xs">
                             <span>
@@ -726,6 +961,143 @@ export function SettingsModal({
                     添加阶段
                   </Button>
                 </form>
+              </section>
+
+              <section
+                className="bd-space-y-2.5 bd-border-t bd-border-border bd-pt-4"
+                aria-label="推进文档模板"
+              >
+                <div className="bd-flex bd-flex-wrap bd-items-center bd-justify-between bd-gap-2">
+                  <div>
+                    <Label htmlFor="budde-type-doc-template">推进文档模板（Markdown）</Label>
+                    <FieldHelp>
+                      支持 {"{{title}}"}、{"{{description}}"}、{"{{nextStep}}"}、{"{{date}}"}；模板中的二级标题（{"## 阶段名"}）在新建文档后会自动匹配并挂载到对应阶段。
+                    </FieldHelp>
+                  </div>
+                  {notes.readDocMarkdown && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setPickingTemplateDoc((v) => !v)}
+                    >
+                      <Icon name="note" />
+                      {pickingTemplateDoc ? "收起文档提取" : "从思源文档提取…"}
+                    </Button>
+                  )}
+                </div>
+
+                {pickingTemplateDoc && notes.readDocMarkdown && (
+                  <div className="bd-space-y-2 bd-rounded-md bd-border bd-border-border bd-bg-muted/30 bd-p-2.5">
+                    <Input
+                      value={templateDocQuery}
+                      placeholder="搜索思源文档以载入其 Markdown 内容作为模板…"
+                      aria-label="搜索思源模板文档"
+                      onChange={(e) => setTemplateDocQuery(e.target.value)}
+                      className="bd-h-8 bd-text-xs"
+                    />
+                    <div className="bd-max-h-36 bd-space-y-1 bd-overflow-y-auto">
+                      {templateDocResults.map((hit) => (
+                        <button
+                          key={hit.id}
+                          type="button"
+                          disabled={loadingTemplateDoc}
+                          onClick={async () => {
+                            if (!notes.readDocMarkdown) return;
+                            setLoadingTemplateDoc(true);
+                            try {
+                              const doc = await notes.readDocMarkdown(hit.id);
+                              setTemplateDraft(doc.markdown);
+                              setPickingTemplateDoc(false);
+                              toast(
+                                `已载入「${hit.title}」，点击「保存模板」生效`,
+                                "success",
+                              );
+                            } catch (err) {
+                              toast(
+                                err instanceof Error ? err.message : "读取文档失败",
+                                "error",
+                              );
+                            } finally {
+                              setLoadingTemplateDoc(false);
+                            }
+                          }}
+                          className="bd-flex bd-w-full bd-items-center bd-justify-between bd-gap-2 bd-rounded bd-px-2 bd-py-1.5 bd-text-left bd-text-xs hover:bd-bg-muted"
+                        >
+                          <span className="bd-truncate bd-font-medium">{hit.title}</span>
+                          {hit.hpath && (
+                            <span className="bd-truncate bd-text-[11px] bd-text-muted-foreground">
+                              {hit.hpath}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                      {templateDocResults.length === 0 && (
+                        <p className="bd-px-2 bd-py-1 bd-text-xs bd-text-muted-foreground">
+                          没有匹配的思源文档
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <Textarea
+                  id="budde-type-doc-template"
+                  rows={6}
+                  value={templateDraft}
+                  placeholder="# {{title}}&#10;&#10;## 背景与目标&#10;{{description}}"
+                  onChange={(e) => setTemplateDraft(e.target.value)}
+                  className="bd-font-mono bd-text-xs"
+                />
+                <div className="bd-flex bd-flex-wrap bd-items-center bd-justify-end bd-gap-2">
+                  {templateDraft !== (activeType.docTemplate ?? "") && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setTemplateDraft(activeType.docTemplate ?? "")}
+                    >
+                      恢复原内容
+                    </Button>
+                  )}
+                  {(activeType.docTemplate || templateDraft) && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={async () => {
+                        setTemplateDraft("");
+                        await execute(
+                          {
+                            kind: "type.update",
+                            id: activeType.id,
+                            name: activeType.name,
+                            docTemplate: null,
+                            expectedRevision: state.revision,
+                          },
+                          { successMessage: "已清空推进文档模板" },
+                        );
+                      }}
+                    >
+                      清空模板
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    disabled={templateDraft === (activeType.docTemplate ?? "")}
+                    onClick={() => {
+                      void execute(
+                        {
+                          kind: "type.update",
+                          id: activeType.id,
+                          name: activeType.name,
+                          docTemplate: templateDraft.trim() ? templateDraft : null,
+                          expectedRevision: state.revision,
+                        },
+                        { successMessage: "推进文档模板已保存" },
+                      );
+                    }}
+                  >
+                    保存模板
+                  </Button>
+                </div>
               </section>
 
               <section className="bd-border-t bd-border-border bd-pt-4" aria-label="危险操作">

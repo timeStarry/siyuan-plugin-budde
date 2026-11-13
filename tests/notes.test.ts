@@ -119,3 +119,60 @@ test("destroy abort signal prevents host tab opening after delayed note lookup",
   await opening;
   assert.equal(opened, 0);
 });
+
+test("SiYuanNotes reads doc markdown and extracts headings via getChildBlocks with SQL fallback", async () => {
+  const headingId = "20261113120001-hd12345";
+  const bridge = new SiYuanNotes(
+    () => {},
+    async (url, init) => {
+      if (url === "/api/export/exportMdContent") {
+        return new Response(
+          JSON.stringify({
+            code: 0,
+            data: { hPath: "/研发/方案模板", content: "# 方案模板\n\n## 设想\n内容" },
+          }),
+        );
+      }
+      if (url === "/api/block/getChildBlocks") {
+        return new Response(
+          JSON.stringify({
+            code: 0,
+            data: [
+              { id: headingId, type: "h", content: "<h2>设想</h2>" },
+              { id: "20261113120002-pr12345", type: "p", content: "正文" },
+            ],
+          }),
+        );
+      }
+      throw new Error(`unexpected ${url}: ${JSON.stringify(init)}`);
+    },
+  );
+
+  const md = await bridge.readDocMarkdown(id);
+  assert.equal(md.title, "方案模板");
+  assert.match(md.markdown, /## 设想/);
+
+  const headings = await bridge.getDocHeadings(id);
+  assert.deepEqual(headings, [{ id: headingId, content: "设想" }]);
+
+  // SQL fallback when getChildBlocks rejects
+  const fallbackBridge = new SiYuanNotes(
+    () => {},
+    async (url) => {
+      if (url === "/api/block/getChildBlocks") {
+        return new Response(JSON.stringify({ code: -1, msg: "unsupported" }));
+      }
+      if (url === "/api/query/sql") {
+        return new Response(
+          JSON.stringify({
+            code: 0,
+            data: [{ id: headingId, content: "## 实施与打磨" }],
+          }),
+        );
+      }
+      throw new Error(`unexpected ${url}`);
+    },
+  );
+  const fallbackHeadings = await fallbackBridge.getDocHeadings(id);
+  assert.deepEqual(fallbackHeadings, [{ id: headingId, content: "实施与打磨" }]);
+});

@@ -7,7 +7,7 @@ import {
   type ViewFilters,
 } from "./model";
 import { ItemMoreMenu, type ItemCardActions } from "./item-card";
-import { TypeBadge } from "./type-presentation";
+import { PriorityBadge, TypeBadge } from "./type-presentation";
 import { Icon } from "./components/icons";
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
@@ -82,13 +82,21 @@ export function ItemListView({
             onClick={() => toggleColumnSort("type")}
           />
         </div>
-        <div className="bd-w-24 bd-shrink-0 [@container(max-width:680px)]:bd-hidden">
+        <div className="bd-w-16 bd-shrink-0 [@container(max-width:500px)]:bd-hidden">
+          <SortHeaderButton
+            label="优先级"
+            active={filters.sort === "priority"}
+            asc={filters.sortAsc ?? defaultSortAsc("priority")}
+            onClick={() => toggleColumnSort("priority")}
+          />
+        </div>
+        <div className="bd-w-24 bd-shrink-0 [@container(max-width:720px)]:bd-hidden">
           阶段
         </div>
-        <div className="bd-w-12 bd-shrink-0 bd-text-right [@container(max-width:780px)]:bd-hidden">
+        <div className="bd-w-12 bd-shrink-0 bd-text-right [@container(max-width:820px)]:bd-hidden">
           笔记
         </div>
-        <div className="bd-flex bd-w-20 bd-shrink-0 bd-justify-end [@container(max-width:560px)]:bd-hidden">
+        <div className="bd-flex bd-w-20 bd-shrink-0 bd-justify-end [@container(max-width:600px)]:bd-hidden">
           <SortHeaderButton
             label="更新"
             align="right"
@@ -185,7 +193,15 @@ export function ItemListView({
                 <TypeBadge type={type} />
               </div>
 
-              <div className="bd-w-24 bd-shrink-0 bd-truncate bd-text-xs [@container(max-width:680px)]:bd-hidden">
+              <div className="bd-flex bd-w-16 bd-shrink-0 bd-items-center [@container(max-width:500px)]:bd-hidden">
+                {item.priority ? (
+                  <PriorityBadge priority={item.priority} />
+                ) : (
+                  <span className="bd-text-xs bd-text-muted-foreground/35">—</span>
+                )}
+              </div>
+
+              <div className="bd-w-24 bd-shrink-0 bd-truncate bd-text-xs [@container(max-width:720px)]:bd-hidden">
                 {item.status === "pool" ? (
                   <span className="bd-text-muted-foreground/75">待孵化</span>
                 ) : item.status === "archived" ? (
@@ -195,7 +211,7 @@ export function ItemListView({
                 )}
               </div>
 
-              <div className="bd-w-12 bd-shrink-0 bd-text-right bd-text-xs bd-text-muted-foreground bd-tabular-nums [@container(max-width:780px)]:bd-hidden">
+              <div className="bd-w-12 bd-shrink-0 bd-text-right bd-text-xs bd-text-muted-foreground bd-tabular-nums [@container(max-width:820px)]:bd-hidden">
                 {item.links.length > 0 ? (
                   <span
                     className="bd-inline-flex bd-items-center bd-justify-end bd-gap-1"
@@ -210,7 +226,7 @@ export function ItemListView({
               </div>
 
               <div
-                className="bd-w-20 bd-shrink-0 bd-text-right bd-text-xs bd-text-muted-foreground bd-tabular-nums [@container(max-width:560px)]:bd-hidden"
+                className="bd-w-20 bd-shrink-0 bd-text-right bd-text-xs bd-text-muted-foreground bd-tabular-nums [@container(max-width:600px)]:bd-hidden"
                 title={item.updatedAt}
               >
                 {formatRelativeTime(item.updatedAt)}

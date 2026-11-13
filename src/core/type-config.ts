@@ -1,4 +1,4 @@
-/** Offline presentation vocabulary; pure data, independent of UI and SiYuan. */
+/** Offline presentation & workflow vocabulary; pure data, independent of UI and SiYuan. */
 export const TYPE_ICONS = [
   { name: "Shapes", label: "通用", keywords: "形状 分类 类型" },
   { name: "Lightbulb", label: "灵感", keywords: "想法 创意 点子 通用" },
@@ -42,6 +42,13 @@ export type TypeLucideIcon = (typeof TYPE_ICONS)[number]["name"];
 export const TYPE_COLORS = ["default", "blue", "emerald", "amber", "violet", "rose"] as const;
 export type TypeColor = (typeof TYPE_COLORS)[number];
 
+export const ITEM_PRIORITIES = ["high", "medium", "low"] as const;
+export const PRIORITY_LABELS = {
+  high: "重点",
+  medium: "常规",
+  low: "随缘",
+} as const;
+
 export const DEFAULT_REVIEW_DAYS = 14;
 export const REVIEW_DAY_PRESETS = [
   { value: 7, label: "7 天" },
@@ -69,17 +76,42 @@ export function isTypeColor(value: unknown): value is TypeColor {
   return typeof value === "string" && (TYPE_COLORS as readonly string[]).includes(value);
 }
 
+export function isItemPriority(value: unknown): value is (typeof ITEM_PRIORITIES)[number] {
+  return typeof value === "string" && (ITEM_PRIORITIES as readonly string[]).includes(value);
+}
+
 export function isValidReviewDays(value: unknown): value is number | null {
   if (value === null) return true;
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= 365;
+}
+
+export interface StageTemplateItem {
+  name: string;
+  completed: boolean;
+  criteria?: readonly string[];
+}
+
+export interface StageTemplateConfig {
+  label: string;
+  defaultIcon: TypeLucideIcon;
+  defaultColor: TypeColor;
+  defaultReviewDays: number;
+  defaultDocTemplate?: string;
+  stages: readonly StageTemplateItem[];
 }
 
 export const STAGE_TEMPLATES = {
   basic: {
     label: "基础 · 想法到完成",
     defaultIcon: "Lightbulb",
-    defaultColor: "amber" as TypeColor,
+    defaultColor: "amber",
     defaultReviewDays: 14,
+    defaultDocTemplate: `# {{title}}
+
+> {{description}}
+
+## 进行中
+- [ ] {{nextStep}}`,
     stages: [
       { name: "想法", completed: false },
       { name: "进行中", completed: false },
@@ -89,60 +121,164 @@ export const STAGE_TEMPLATES = {
   article: {
     label: "写作 · 选题到发布",
     defaultIcon: "PenLine",
-    defaultColor: "blue" as TypeColor,
+    defaultColor: "blue",
     defaultReviewDays: 14,
+    defaultDocTemplate: `# {{title}}
+
+> {{description}}
+
+## 选题
+- 核心想回答的一个问题：
+- 读者读完后的最大收获：
+
+## 大纲素材
+- 核心论点与章节结构：
+- 关键案例 / 引用数据：
+
+## 初稿
+- （只管写完，暂不打磨措辞）
+
+## 润色定稿
+- 检查标题、首段与结论是否前后呼应`,
     stages: [
-      { name: "选题", completed: false },
-      { name: "大纲素材", completed: false },
-      { name: "初稿", completed: false },
-      { name: "润色定稿", completed: false },
+      {
+        name: "选题",
+        completed: false,
+        criteria: ["一句话写清本文只回答哪一个核心问题", "明确目标读者与文章立意"],
+      },
+      {
+        name: "大纲素材",
+        completed: false,
+        criteria: ["确定 3~5 个一级章节脉络", "补齐核心案例、数据或思源参考块"],
+      },
+      {
+        name: "初稿",
+        completed: false,
+        criteria: ["一气呵成写完完整草稿（写完再改）", "补全结尾行动号召或总结"],
+      },
+      {
+        name: "润色定稿",
+        completed: false,
+        criteria: ["通读删减冗余段落", "校准标题表达与排版细节"],
+      },
       { name: "已发布", completed: true },
     ],
   },
   project: {
     label: "项目开发 · 构想到发布",
     defaultIcon: "Code2",
-    defaultColor: "violet" as TypeColor,
+    defaultColor: "violet",
     defaultReviewDays: 7,
+    defaultDocTemplate: `# {{title}}
+
+> {{description}}
+
+## 构想
+- 真实痛点与触发场景：
+- 为什么现在值得做：
+
+## 方案设计
+- 核心架构 / 交互方案：
+- 本次坚决不做的边界（Non-goals）：
+
+## 原型实现
+- 下一步：{{nextStep}}
+
+## 打磨验收
+- 核心路径走查与边界测试记录：`,
     stages: [
-      { name: "构想", completed: false },
-      { name: "方案设计", completed: false },
-      { name: "原型实现", completed: false },
-      { name: "打磨验收", completed: false },
+      {
+        name: "构想",
+        completed: false,
+        criteria: ["明确要解决的真实痛点", "确认个人做这件事的最小动机"],
+      },
+      {
+        name: "方案设计",
+        completed: false,
+        criteria: [
+          "一句话说清最小可行方案（MVP）",
+          "明确本次不做的范围边界",
+          "关键数据流或技术风险点已验证",
+        ],
+      },
+      {
+        name: "原型实现",
+        completed: false,
+        criteria: ["核心主流程端到端跑通", "关键边界与异常有兜底"],
+      },
+      {
+        name: "打磨验收",
+        completed: false,
+        criteria: ["关键测试或真实环境走查通过", "补齐使用说明或记录总结"],
+      },
       { name: "已发布", completed: true },
     ],
   },
   reading: {
     label: "阅读课题 · 想读到沉淀",
     defaultIcon: "BookOpen",
-    defaultColor: "emerald" as TypeColor,
+    defaultColor: "emerald",
     defaultReviewDays: 30,
+    defaultDocTemplate: `# {{title}}
+
+> {{description}}
+
+## 想读
+- 带着什么具体问题去读：
+
+## 在读摘录
+- 关键原文摘录与出处：
+
+## 消化整理
+- 用自己的话转述核心观点（可拆成独立卡片）：`,
     stages: [
-      { name: "想读", completed: false },
-      { name: "在读摘录", completed: false },
-      { name: "消化整理", completed: false },
+      {
+        name: "想读",
+        completed: false,
+        criteria: ["写下带着阅读的 1~2 个具体问题"],
+      },
+      {
+        name: "在读摘录",
+        completed: false,
+        criteria: ["记录核心原文摘录与自己当下的批注"],
+      },
+      {
+        name: "消化整理",
+        completed: false,
+        criteria: ["用自己的话写一段核心复盘结论"],
+      },
       { name: "已沉淀", completed: true },
     ],
   },
   travel: {
     label: "旅行 · 想去到结束",
     defaultIcon: "Compass",
-    defaultColor: "emerald" as TypeColor,
+    defaultColor: "emerald",
     defaultReviewDays: 30,
+    defaultDocTemplate: `# {{title}}
+
+> {{description}}
+
+## 规划
+- 出行时间窗口与同行人：
+- 每日主线安排与必去点：
+
+## 已预订
+- 交通与住宿确认信息：`,
     stages: [
       { name: "想去", completed: false },
-      { name: "规划", completed: false },
-      { name: "已预订", completed: false },
+      { name: "规划", completed: false, criteria: ["确定大致时间窗与交通方式", "拟定每日主线行程"] },
+      { name: "已预订", completed: false, criteria: ["核对机票/车票与住宿订单"] },
       { name: "已结束", completed: true },
     ],
   },
   blank: {
     label: "极简 · 仅一个起始阶段",
     defaultIcon: "Shapes",
-    defaultColor: "default" as TypeColor,
+    defaultColor: "default",
     defaultReviewDays: 14,
     stages: [{ name: "想法", completed: false }],
   },
-} as const;
+} as const satisfies Record<string, StageTemplateConfig>;
 
 export type StageTemplateId = keyof typeof STAGE_TEMPLATES;

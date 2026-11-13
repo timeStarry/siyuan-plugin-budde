@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { BuddeService, MemoryStore } from "../src/core/service";
 import {
   CaptureRequest,
+  getStageCriteriaSummary,
   getWorkspaceCounts,
   needsReview,
   selectActiveItems,
@@ -185,4 +186,66 @@ test("pool sorting supports type order, title locale order, and sortAsc directio
     byTitleDescWithPin.map((i) => i.title),
     ["B 项目重构", "C 技术文章", "A 日常采购"],
   );
+});
+
+test("selectPoolItems supports priority sorting and getStageCriteriaSummary computes preset + custom totals", async () => {
+  const client = new BuddeService(new MemoryStore(), () => "2026-11-11T00:00:00.000Z");
+  await client.execute({ kind: "item.create", requestId: "req-prio-1", title: "随缘想法", priority: "low" });
+  await client.execute({ kind: "item.create", requestId: "req-prio-2", title: "未定想法" });
+  await client.execute({ kind: "item.create", requestId: "req-prio-3", title: "常规想法", priority: "medium" });
+  const hi = await client.execute({ kind: "item.create", requestId: "req-prio-4", title: "重点想法", priority: "high" });
+
+  const asc = selectPoolItems(hi.state, {
+    ...defaultFilters,
+    sort: "priority",
+    sortAsc: true,
+  });
+  assert.deepEqual(
+    asc.map((i) => i.title),
+    ["重点想法", "常规想法", "未定想法", "随缘想法"],
+  );
+
+  const desc = selectPoolItems(hi.state, {
+    ...defaultFilters,
+    sort: "priority",
+    sortAsc: false,
+  });
+  assert.deepEqual(
+    desc.map((i) => i.title),
+    ["随缘想法", "未定想法", "常规想法", "重点想法"],
+  );
+
+  const proj = await client.execute({
+    kind: "item.create",
+    requestId: "req-prio-5",
+    title: "基准项目",
+    typeId: "project",
+    status: "active",
+  });
+  const projType = proj.state.types.find((t) => t.id === "project")!;
+  const stage = projType.stages[1];
+  const presetIds = (stage.criteria ?? []).map((c) => c.id);
+  const patched = await client.execute({
+    kind: "item.update",
+    id: proj.itemId!,
+    expectedVersion: proj.state.items.find((i) => i.id === proj.itemId)!.version,
+    patch: {
+      stageId: stage.id,
+      criteriaState: {
+        [stage.id]: {
+          checkedIds: presetIds.slice(0, 1),
+          custom: [
+            { id: "c1", text: "补充用例", done: true },
+            { id: "c2", text: "灰度验证", done: false },
+          ],
+        },
+      },
+    },
+  });
+  const summary = getStageCriteriaSummary(
+    patched.state.items.find((i) => i.id === proj.itemId)!,
+    stage,
+  );
+  assert.equal(summary.done, 2);
+  assert.equal(summary.total, presetIds.length + 2);
 });

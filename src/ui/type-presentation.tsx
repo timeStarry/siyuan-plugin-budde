@@ -37,8 +37,9 @@ import {
   Gamepad2,
   Leaf,
 } from "lucide-react";
-import type { ItemType } from "../core/types";
+import type { ItemPriority, ItemType } from "../core/types";
 import {
+  PRIORITY_LABELS,
   TYPE_ICONS,
   TYPE_COLORS,
   isTypeIcon,
@@ -164,6 +165,33 @@ export function TypeBadge({
     >
       <TypeIcon type={type} />
       <span className="bd-truncate">{type.name}</span>
+    </span>
+  );
+}
+
+const PRIORITY_STYLES: Record<ItemPriority, string> = {
+  high: "bd-border-warning/35 bd-bg-warning/12 bd-text-warning bd-font-medium",
+  medium: "bd-border-border bd-bg-muted/70 bd-text-foreground/80 bd-font-normal",
+  low: "bd-border-border/70 bd-bg-transparent bd-text-muted-foreground/80 bd-font-normal",
+};
+
+export function PriorityBadge({
+  priority,
+  className = "",
+}: {
+  priority?: ItemPriority;
+  className?: string;
+}) {
+  if (!priority) return null;
+  return (
+    <span
+      data-priority-badge={priority}
+      className={`bd-inline-flex bd-shrink-0 bd-items-center bd-gap-1 bd-rounded-md bd-border bd-px-1.5 bd-py-0.5 bd-text-xs bd-leading-4 ${PRIORITY_STYLES[priority]} ${className}`.trim()}
+    >
+      {priority === "high" && (
+        <span aria-hidden="true" className="bd-h-1.5 bd-w-1.5 bd-rounded-full bd-bg-current" />
+      )}
+      <span>{PRIORITY_LABELS[priority]}</span>
     </span>
   );
 }

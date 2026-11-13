@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { BuddeState, Item } from "../core/types";
+import type { BuddeState, Item, ItemPriority } from "../core/types";
+import { PRIORITY_LABELS } from "../core/type-config";
 import {
   CaptureRequest,
   getWorkspaceCounts,
@@ -178,6 +179,21 @@ export function WorkbenchApp() {
             patch: { pinned: !item.pinned },
           },
           { successMessage: item.pinned ? "已取消置顶" : "已置顶事项" },
+        );
+      },
+      onSetPriority: (item, priority: ItemPriority | null) => {
+        void execute(
+          {
+            kind: "item.update",
+            id: item.id,
+            expectedVersion: item.version,
+            patch: { priority },
+          },
+          {
+            successMessage: priority
+              ? `已设为「${PRIORITY_LABELS[priority]}」`
+              : "已清除优先级",
+          },
         );
       },
       onMoveStage: (item, stageId) => {
@@ -579,6 +595,17 @@ export function WorkbenchApp() {
       <main className="workspace bd-relative bd-flex bd-min-h-0 bd-min-w-0 bd-flex-1 bd-overflow-hidden">
         <div
           data-budde-shell="main"
+          onClick={(e) => {
+            if (!selectedId) return;
+            const target = e.target as HTMLElement;
+            if (
+              !target.closest(
+                'button,a,input,textarea,select,[role="button"],[role="menuitem"],[data-item-id],[data-list-row],[data-menu-owner]',
+              )
+            ) {
+              setSelectedId("");
+            }
+          }}
           className="main-panel bd-flex bd-min-h-0 bd-min-w-0 bd-flex-1 bd-overflow-hidden"
         >
           {view === "board" ? (
@@ -1009,6 +1036,7 @@ function FilterToolbar({
         className="bd-h-8 bd-w-32 bd-text-xs [@container(max-width:520px)]:bd-min-w-0 [@container(max-width:520px)]:bd-flex-1"
       >
         <option value="manual">置顶与默认</option>
+        <option value="priority">按优先级</option>
         <option value="updated">最近更新</option>
         <option value="created">最近创建</option>
         <option value="type">按类型分组</option>

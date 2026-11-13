@@ -64,11 +64,13 @@ export function DropdownMenuItem({
   onSelect,
   disabled,
   destructive = false,
+  className = "",
   children,
 }: {
   onSelect?: () => void;
   disabled?: boolean;
   destructive?: boolean;
+  className?: string;
   children: ReactNode;
 }) {
   return (
@@ -77,7 +79,7 @@ export function DropdownMenuItem({
       onSelect={() => onSelect?.()}
       className={`bd-flex bd-h-8 bd-w-full bd-cursor-pointer bd-select-none bd-items-center bd-gap-2 bd-rounded-sm bd-px-2.5 bd-text-control bd-outline-none focus:bd-bg-muted data-[disabled]:bd-pointer-events-none data-[disabled]:bd-opacity-45 ${
         destructive ? "bd-text-destructive focus:bd-bg-destructive/10" : "bd-text-foreground"
-      }`}
+      } ${className}`.trim()}
     >
       {children}
     </Menu.Item>

@@ -9,13 +9,18 @@ import type {
   ItemType,
   NoteLink,
   RequestRecord,
+  StageCriteriaProgress,
+  StageCriterion,
   StateStore,
 } from "./types";
+import { parseTypePack } from "./template";
 import {
+  isItemPriority,
   isTypeColor,
   isTypeIcon,
   isValidReviewDays,
   STAGE_TEMPLATES,
+  type StageTemplateConfig,
   type TypeColor,
 } from "./type-config";
 
@@ -91,6 +96,7 @@ function applyPresentation(
     icon?: string | null;
     color?: TypeColor | null;
     reviewDays?: number | null;
+    docTemplate?: string | null;
   },
 ) {
   if (patch.icon !== undefined) {
@@ -112,15 +118,70 @@ function applyPresentation(
       fail("复查周期须为 1–365 天或关闭提醒。");
     type.reviewDays = patch.reviewDays;
   }
+  if (patch.docTemplate !== undefined) {
+    if (patch.docTemplate === null || !patch.docTemplate.trim()) {
+      delete type.docTemplate;
+    } else {
+      type.docTemplate = text(patch.docTemplate, "推进文档模板", 20000);
+    }
+  }
 }
 
-function validateLinks(links: unknown): asserts links is NoteLink[] {
+function validateStageCriteria(criteria: unknown): asserts criteria is StageCriterion[] {
+  if (!Array.isArray(criteria) || criteria.length > 20)
+    fail("阶段准出清单格式无效，最多支持 20 条。");
+  const ids: string[] = [];
+  for (const entry of criteria) {
+    object(entry);
+    const id = name(entry.id, "准出项 ID", 200);
+    name(entry.text, "准出检查项", 200);
+    ids.push(id);
+  }
+  unique(ids, "准出项 ID");
+}
+
+function validateCriteriaState(
+  raw: unknown,
+  stageIds: Set<string>,
+): asserts raw is Record<string, StageCriteriaProgress> {
+  object(raw);
+  for (const [stageId, entry] of Object.entries(raw)) {
+    if (!stageIds.has(stageId)) fail("准出进度引用了不存在的阶段。");
+    object(entry);
+    if (entry.checkedIds !== undefined) {
+      if (!Array.isArray(entry.checkedIds) || entry.checkedIds.length > 50)
+        fail("已勾选准出项格式无效。");
+      for (const cid of entry.checkedIds) {
+        name(cid, "准出项 ID", 200);
+      }
+      unique(entry.checkedIds as string[], "已勾选准出项 ID");
+    }
+    if (entry.custom !== undefined) {
+      if (!Array.isArray(entry.custom) || entry.custom.length > 30)
+        fail("事项专属检查项格式无效。");
+      const ids: string[] = [];
+      for (const custom of entry.custom) {
+        object(custom);
+        ids.push(name(custom.id, "专属检查项 ID", 200));
+        name(custom.text, "专属检查项内容", 200);
+        bool(custom.done);
+      }
+      unique(ids, "专属检查项 ID");
+    }
+  }
+}
+
+function validateLinks(links: unknown, stageIds?: Set<string>): asserts links is NoteLink[] {
   if (!Array.isArray(links)) fail("关联格式无效。");
   for (const link of links as unknown[]) {
     object(link);
     name(link.id, "关联 ID", 200);
     text(link.title, "关联名称", 500);
     if (link.hpath !== undefined) text(link.hpath, "关联路径", 1000);
+    if (link.stageId !== undefined) {
+      const sid = name(link.stageId, "关联阶段 ID", 200);
+      if (stageIds && !stageIds.has(sid)) fail("笔记关联引用了不存在的阶段。");
+    }
     if (
       typeof link.target !== "string" ||
       !/^(?:siyuan:\/\/blocks\/)?\d{14}-[a-z0-9]{7}$/.test(link.target)
@@ -221,6 +282,8 @@ export function validateState(value: unknown): BuddeState {
       fail("类型颜色无效。");
     if (type.reviewDays !== undefined && !isValidReviewDays(type.reviewDays))
       fail("复查周期无效。");
+    if (type.docTemplate !== undefined)
+      text(type.docTemplate, "推进文档模板", 20000);
     if (!Array.isArray(type.stages) || type.stages.length === 0)
       fail("每种类型至少保留一个阶段。");
     for (const stage of type.stages as unknown[]) {
@@ -228,6 +291,7 @@ export function validateState(value: unknown): BuddeState {
       name(stage.id, "阶段 ID", 200);
       name(stage.name);
       bool(stage.completed);
+      if (stage.criteria !== undefined) validateStageCriteria(stage.criteria);
       stageIds.push(stage.id as string);
     }
     if (
@@ -252,13 +316,19 @@ export function validateState(value: unknown): BuddeState {
     const type = types.find((t) => t.id === item.typeId);
     if (!type || !type.stages.some((s) => s.id === item.stageId))
       fail("事项引用了不存在的类型或阶段。");
+    const typeStageIds = new Set(type.stages.map((s) => s.id));
     if (typeof item.status !== "string" || !VALID_STATUSES.has(item.status as ItemStatus))
       fail("事项状态无效。");
+    if (item.priority !== undefined && !isItemPriority(item.priority))
+      fail("事项优先级无效。");
     bool(item.pinned);
     finiteNumber(item.order);
     text(item.description, "说明");
     text(item.nextStep, "下一步");
-    validateLinks(item.links);
+    validateLinks(item.links, typeStageIds);
+    if (item.criteriaState !== undefined) {
+      validateCriteriaState(item.criteriaState, typeStageIds);
+    }
     integer(item.version, 1);
     date(item.createdAt);
     date(item.updatedAt);
@@ -297,6 +367,7 @@ export function createSampleItems(nowIso = new Date().toISOString()): Item[] {
       typeId: "article",
       stageId: "article-0",
       status: "pool",
+      priority: "high",
       pinned: false,
       order: 1000,
       description: "",
@@ -329,6 +400,7 @@ export function createSampleItems(nowIso = new Date().toISOString()): Item[] {
       typeId: "general",
       stageId: "general-0",
       status: "pool",
+      priority: "low",
       pinned: false,
       order: 3000,
       description: "",
@@ -345,11 +417,17 @@ export function createSampleItems(nowIso = new Date().toISOString()): Item[] {
       typeId: "project",
       stageId: "project-2",
       status: "active",
+      priority: "high",
       pinned: true,
       order: 4000,
       description: "Budde 只管轻量阶段与下一步行动，长篇架构草稿与正文直接交给思源笔记承载。",
-      nextStep: "打开右侧详情，点击「新建文档」体验一键创建并挂载产出笔记",
+      nextStep: "打开右侧详情，点击「新建文档」体验一键创建并挂载产出笔记与阶段章节",
       links: [],
+      criteriaState: {
+        "project-2": {
+          checkedIds: ["project-2-c0"],
+        },
+      },
       createdAt: daysAgo(5),
       updatedAt: daysAgo(1),
       reviewedAt: daysAgo(1),
@@ -416,7 +494,8 @@ export function createInitialState(options?: {
     icon: string;
     color: TypeColor;
     reviewDays: number;
-    stages: string[];
+    docTemplate?: string;
+    stages: ReadonlyArray<{ name: string; completed: boolean; criteria?: readonly string[] }>;
   }> = [
     {
       id: "general",
@@ -424,31 +503,40 @@ export function createInitialState(options?: {
       icon: "Lightbulb",
       color: "amber",
       reviewDays: 14,
-      stages: ["想法", "准备做", "进行中", "已完成"],
+      docTemplate: STAGE_TEMPLATES.basic.defaultDocTemplate,
+      stages: [
+        { name: "想法", completed: false },
+        { name: "准备做", completed: false },
+        { name: "进行中", completed: false },
+        { name: "已完成", completed: true },
+      ],
     },
     {
       id: "article",
       name: "写作",
-      icon: "PenLine",
-      color: "blue",
-      reviewDays: 14,
-      stages: ["选题", "大纲素材", "初稿", "润色定稿", "已发布"],
+      icon: STAGE_TEMPLATES.article.defaultIcon,
+      color: STAGE_TEMPLATES.article.defaultColor,
+      reviewDays: STAGE_TEMPLATES.article.defaultReviewDays,
+      docTemplate: STAGE_TEMPLATES.article.defaultDocTemplate,
+      stages: STAGE_TEMPLATES.article.stages,
     },
     {
       id: "project",
       name: "项目开发",
-      icon: "Code2",
-      color: "violet",
-      reviewDays: 7,
-      stages: ["构想", "方案设计", "原型实现", "打磨验收", "已发布"],
+      icon: STAGE_TEMPLATES.project.defaultIcon,
+      color: STAGE_TEMPLATES.project.defaultColor,
+      reviewDays: STAGE_TEMPLATES.project.defaultReviewDays,
+      docTemplate: STAGE_TEMPLATES.project.defaultDocTemplate,
+      stages: STAGE_TEMPLATES.project.stages,
     },
     {
       id: "reading",
       name: "阅读与课题",
-      icon: "BookOpen",
-      color: "emerald",
-      reviewDays: 30,
-      stages: ["想读", "在读摘录", "消化整理", "已沉淀"],
+      icon: STAGE_TEMPLATES.reading.defaultIcon,
+      color: STAGE_TEMPLATES.reading.defaultColor,
+      reviewDays: STAGE_TEMPLATES.reading.defaultReviewDays,
+      docTemplate: STAGE_TEMPLATES.reading.defaultDocTemplate,
+      stages: STAGE_TEMPLATES.reading.stages,
     },
   ];
 
@@ -463,11 +551,20 @@ export function createInitialState(options?: {
       icon: preset.icon,
       color: preset.color,
       reviewDays: preset.reviewDays,
+      ...(preset.docTemplate ? { docTemplate: preset.docTemplate } : {}),
       initialStageId: `${preset.id}-0`,
-      stages: preset.stages.map((label, index) => ({
+      stages: preset.stages.map((stage, index) => ({
         id: `${preset.id}-${index}`,
-        name: label,
-        completed: index === preset.stages.length - 1,
+        name: stage.name,
+        completed: stage.completed,
+        ...(stage.criteria?.length
+          ? {
+              criteria: stage.criteria.map((text, cIndex) => ({
+                id: `${preset.id}-${index}-c${cIndex}`,
+                text,
+              })),
+            }
+          : {}),
       })),
     })),
   };
@@ -534,11 +631,13 @@ const PATCHABLE_FIELDS = new Set([
   "typeId",
   "stageId",
   "status",
+  "priority",
   "pinned",
   "order",
   "description",
   "nextStep",
   "links",
+  "criteriaState",
   "reviewedAt",
 ]);
 
@@ -553,11 +652,23 @@ function patchItem(
     if (!PATCHABLE_FIELDS.has(key)) fail(`不支持修改字段：${key}`);
   }
 
-  const next: Item = { ...item, ...patch };
+  const next: Item = { ...item };
+  for (const [k, v] of Object.entries(patch)) {
+    if (k === "priority") {
+      if (v === null || v === undefined) delete next.priority;
+      else next.priority = v as Item["priority"];
+    } else if (k === "criteriaState") {
+      if (v === null || v === undefined) delete next.criteriaState;
+      else next.criteriaState = v as Item["criteriaState"];
+    } else if (v !== undefined) {
+      (next as unknown as Record<string, unknown>)[k] = v;
+    }
+  }
   const targetType = findType(state, next.typeId);
+  const typeChanged = patch.typeId !== undefined && patch.typeId !== item.typeId;
 
   // When switching type without specifying stageId, fall back cleanly to targetType.initialStageId
-  if (patch.typeId !== undefined && patch.typeId !== item.typeId && patch.stageId === undefined) {
+  if (typeChanged && patch.stageId === undefined) {
     const wasCompleted = state.types
       .find((t) => t.id === item.typeId)
       ?.stages.find((s) => s.id === item.stageId)?.completed;
@@ -565,10 +676,29 @@ function patchItem(
     next.stageId = completedTarget ? completedTarget.id : targetType.initialStageId;
   }
 
-  if (!targetType.stages.some((s) => s.id === next.stageId))
+  const targetStageIds = new Set(targetType.stages.map((s) => s.id));
+  if (typeChanged) {
+    if (next.criteriaState) {
+      for (const sid of Object.keys(next.criteriaState)) {
+        if (!targetStageIds.has(sid)) delete next.criteriaState[sid];
+      }
+      if (Object.keys(next.criteriaState).length === 0) delete next.criteriaState;
+    }
+    if (next.links.some((l) => l.stageId && !targetStageIds.has(l.stageId))) {
+      next.links = next.links.map((l) => {
+        if (!l.stageId || targetStageIds.has(l.stageId)) return l;
+        const copy = { ...l };
+        delete copy.stageId;
+        return copy;
+      });
+    }
+  }
+
+  if (!targetStageIds.has(next.stageId))
     fail("目标阶段不属于所选类型。");
 
   if (!VALID_STATUSES.has(next.status)) fail("事项状态无效。");
+  if (next.priority !== undefined && !isItemPriority(next.priority)) fail("事项优先级无效。");
 
   // Coherence rule: moving a pool item past its initial stage (without explicitly keeping status="pool") promotes it to "active"
   if (
@@ -585,7 +715,19 @@ function patchItem(
   finiteNumber(next.order);
   text(next.description, "说明");
   text(next.nextStep, "下一步");
-  validateLinks(next.links);
+  validateLinks(next.links, targetStageIds);
+  if (next.criteriaState !== undefined) {
+    for (const [sid, entry] of Object.entries(next.criteriaState)) {
+      if (!entry.checkedIds?.length && !entry.custom?.length) {
+        delete next.criteriaState[sid];
+      }
+    }
+    if (Object.keys(next.criteriaState).length === 0) {
+      delete next.criteriaState;
+    } else {
+      validateCriteriaState(next.criteriaState, targetStageIds);
+    }
+  }
   if (next.reviewedAt !== null) date(next.reviewedAt);
 
   const becameActive = next.status === "active" && item.status !== "active";
@@ -595,6 +737,8 @@ function patchItem(
     next.reviewedAt = now;
   }
 
+  if (next.priority === undefined) delete item.priority;
+  if (next.criteriaState === undefined) delete item.criteriaState;
   Object.assign(item, next, { updatedAt: now, version: item.version + 1 });
 }
 
@@ -708,7 +852,10 @@ export class BuddeService implements BuddeClient {
           fail("目标阶段不属于所选类型。");
 
         const links = command.links ? structuredClone(command.links) : [];
-        validateLinks(links);
+        validateLinks(links, new Set(type.stages.map((s) => s.id)));
+        if (command.priority !== undefined && !isItemPriority(command.priority)) {
+          fail("事项优先级无效。");
+        }
 
         itemId = this.uuid();
         state.items.unshift({
@@ -717,6 +864,7 @@ export class BuddeService implements BuddeClient {
           typeId: type.id,
           stageId,
           status,
+          ...(command.priority ? { priority: command.priority } : {}),
           pinned: false,
           order: nextTopOrder(state.items),
           description: command.description ? text(command.description, "说明") : "",
@@ -866,9 +1014,21 @@ export class BuddeService implements BuddeClient {
           const template = command.template === undefined ? "basic" : command.template;
           if (typeof template !== "string" || !Object.hasOwn(STAGE_TEMPLATES, template))
             fail("阶段模板无效。");
-          const preset = STAGE_TEMPLATES[template];
+          const preset: StageTemplateConfig = STAGE_TEMPLATES[template];
           const id = this.uuid();
-          const stages = preset.stages.map((stage) => ({ ...stage, id: this.uuid() }));
+          const stages = preset.stages.map((stage) => ({
+            id: this.uuid(),
+            name: stage.name,
+            completed: stage.completed,
+            ...(stage.criteria?.length
+              ? {
+                  criteria: stage.criteria.map((criterionText) => ({
+                    id: this.uuid(),
+                    text: criterionText,
+                  })),
+                }
+              : {}),
+          }));
           const type: ItemType = {
             id,
             name: name(command.name),
@@ -877,9 +1037,40 @@ export class BuddeService implements BuddeClient {
             icon: preset.defaultIcon,
             color: preset.defaultColor,
             reviewDays: preset.defaultReviewDays,
+            ...(preset.defaultDocTemplate ? { docTemplate: preset.defaultDocTemplate } : {}),
           };
           applyPresentation(type, command);
           state.types.push(type);
+        } else if (command.kind === "type.import") {
+          const validatedPack = parseTypePack(JSON.stringify(command.pack));
+          const stages = validatedPack.type.stages.map((stage) => ({
+            id: this.uuid(),
+            name: stage.name,
+            completed: stage.completed,
+            ...(stage.criteria?.length
+              ? {
+                  criteria: stage.criteria.map((criterionText) => ({
+                    id: this.uuid(),
+                    text: criterionText,
+                  })),
+                }
+              : {}),
+          }));
+          const importedType: ItemType = {
+            id: this.uuid(),
+            name: validatedPack.type.name,
+            initialStageId: stages[validatedPack.type.initialStageIndex].id,
+            stages,
+            ...(validatedPack.type.icon ? { icon: validatedPack.type.icon } : {}),
+            ...(validatedPack.type.color ? { color: validatedPack.type.color } : {}),
+            ...(validatedPack.type.reviewDays !== undefined
+              ? { reviewDays: validatedPack.type.reviewDays }
+              : {}),
+            ...(validatedPack.type.docTemplate
+              ? { docTemplate: validatedPack.type.docTemplate }
+              : {}),
+          };
+          state.types.push(importedType);
         } else if (command.kind === "type.update") {
           const type = findType(state, command.id);
           type.name = name(command.name);
@@ -928,10 +1119,20 @@ export class BuddeService implements BuddeClient {
           }
           state.types = state.types.filter((t) => t.id !== sourceType.id);
         } else if (command.kind === "stage.add") {
+          let criteria: StageCriterion[] | undefined;
+          if (command.criteria !== undefined) {
+            if (!Array.isArray(command.criteria) || command.criteria.length > 20)
+              fail("阶段准出清单格式无效。");
+            criteria = command.criteria.map((c) => ({
+              id: this.uuid(),
+              text: name(c, "准出检查项", 200),
+            }));
+          }
           findType(state, command.typeId).stages.push({
             id: this.uuid(),
             name: name(command.name),
             completed: Boolean(command.completed),
+            ...(criteria?.length ? { criteria } : {}),
           });
         } else if (command.kind === "stage.update") {
           const stage = findType(state, command.typeId).stages.find(
@@ -941,6 +1142,27 @@ export class BuddeService implements BuddeClient {
           bool(command.completed);
           stage.name = name(command.name);
           stage.completed = command.completed;
+          if (command.criteria !== undefined) {
+            if (command.criteria === null || command.criteria.length === 0) {
+              delete stage.criteria;
+            } else {
+              if (!Array.isArray(command.criteria) || command.criteria.length > 20)
+                fail("阶段准出清单格式无效，最多支持 20 条。");
+              const seen = new Set<string>();
+              stage.criteria = command.criteria.map((entry) => {
+                object(entry);
+                const cid =
+                  typeof entry.id === "string" && entry.id.trim() && !seen.has(entry.id.trim())
+                    ? name(entry.id, "准出项 ID", 200)
+                    : this.uuid();
+                seen.add(cid);
+                return {
+                  id: cid,
+                  text: name(entry.text, "准出检查项", 200),
+                };
+              });
+            }
+          }
         } else if (command.kind === "stage.delete") {
           const type = findType(state, command.typeId);
           if (!type.stages.some((s) => s.id === command.id))
@@ -956,6 +1178,21 @@ export class BuddeService implements BuddeClient {
             fail("删除此阶段前，请选择有效的迁移目标阶段。");
           for (const item of affected) {
             patchItem(state, item, { stageId: target!.id }, now);
+          }
+          for (const item of state.items) {
+            if (item.typeId !== type.id) continue;
+            if (item.criteriaState && Object.hasOwn(item.criteriaState, command.id)) {
+              delete item.criteriaState[command.id];
+              if (Object.keys(item.criteriaState).length === 0) delete item.criteriaState;
+            }
+            if (item.links.some((l) => l.stageId === command.id)) {
+              item.links = item.links.map((l) => {
+                if (l.stageId !== command.id) return l;
+                const copy = { ...l };
+                delete copy.stageId;
+                return copy;
+              });
+            }
           }
           if (type.initialStageId === command.id) {
             type.initialStageId = target!.id;

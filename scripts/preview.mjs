@@ -40,18 +40,21 @@ export async function startPreview() {
             title: '插件整体架构草稿',
             hpath: '/研发笔记/插件整体架构草稿',
             isDoc: true,
+            markdown: '# 插件整体架构草稿\\n\\n## 设想\\n梳理模块边界与命令契约。\\n\\n## 方案\\n完成 Core / UI 分层。',
           },
           {
             id: '20260102153000-uxnotes',
             title: '看板与想法池交互调研',
             hpath: '/产品思考/看板与想法池交互调研',
             isDoc: true,
+            markdown: '# 看板与想法池交互调研\\n\\n## 调研要点\\n抽屉悬浮覆盖，不压缩左侧卡片排版。',
           },
           {
             id: '20260103091500-refblk1',
             title: '关键设计约束摘录段落',
             hpath: '/产品思考/看板与想法池交互调研',
             isDoc: false,
+            markdown: '关键设计约束摘录段落',
           },
         ];
 
@@ -93,14 +96,45 @@ export async function startPreview() {
               .map((d) => ({ ...d, target: 'siyuan://blocks/' + d.id }));
           },
           listNotebooks: async () => notebooks,
-          createDoc: async ({ notebookId, title }) => {
+          createDoc: async ({ notebookId, title, markdown }) => {
             docSeq += 1;
             const id = '202611121200' + String(docSeq).padStart(2, '0') + '-created';
             const nb = notebooks.find((n) => n.id === notebookId) || notebooks[0];
             const hpath = '/' + nb.name + '/' + title;
-            const entry = { id, title, hpath, isDoc: true };
+            const md = typeof markdown === 'string' ? markdown : '';
+            const entry = { id, title, hpath, isDoc: true, markdown: md };
             syntheticDocs.unshift(entry);
+            const headingMatches = md.matchAll(/^#{1,3}\\s+(.+)$/gm);
+            let hIdx = 0;
+            for (const m of headingMatches) {
+              hIdx += 1;
+              const headingTitle = m[1].trim();
+              syntheticDocs.push({
+                id: '202611121200' + String(docSeq).padStart(2, '0') + '-hd' + String(hIdx).padStart(5, '0'),
+                parentDocId: id,
+                title: headingTitle,
+                hpath,
+                isDoc: false,
+                markdown: '## ' + headingTitle,
+              });
+            }
             return { id, target: 'siyuan://blocks/' + id, title, hpath };
+          },
+          readDocMarkdown: async (id) => {
+            const cleanId = String(id).replace('siyuan://blocks/', '');
+            const hit = syntheticDocs.find((d) => d.id === cleanId);
+            if (!hit) throw new Error('未找到文档');
+            return {
+              id: hit.id,
+              title: hit.title,
+              markdown: hit.markdown || ('# ' + hit.title),
+            };
+          },
+          getDocHeadings: async (docId) => {
+            const cleanId = String(docId).replace('siyuan://blocks/', '');
+            return syntheticDocs
+              .filter((d) => d.parentDocId === cleanId)
+              .map((d) => ({ id: d.id, content: d.title }));
           },
           resolveMany: async (targets) => {
             const map = {};

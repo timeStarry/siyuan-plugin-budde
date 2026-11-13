@@ -1,7 +1,7 @@
 import type { CSSProperties, HTMLAttributes } from "react";
-import type { BuddeState, Item } from "../core/types";
-import { isCompleted, needsReview } from "./model";
-import { TypeBadge } from "./type-presentation";
+import type { BuddeState, Item, ItemPriority } from "../core/types";
+import { getStageCriteriaSummary, isCompleted, needsReview } from "./model";
+import { PriorityBadge, TypeBadge } from "./type-presentation";
 import { Icon } from "./components/icons";
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
@@ -16,6 +16,7 @@ export interface ItemCardActions {
   onSelect(item: Item): void;
   onPromote?(item: Item): void;
   onTogglePin?(item: Item): void;
+  onSetPriority?(item: Item, priority: ItemPriority | null): void;
   onMoveStage?(item: Item, stageId: string): void;
   onTogglePause?(item: Item): void;
   onArchive?(item: Item, archived: boolean): void;
@@ -51,8 +52,13 @@ export function ItemCard({
   const stage = type.stages.find((s) => s.id === item.stageId) ?? type.stages[0];
   const completed = isCompleted(state, item);
   const review = needsReview(state, item);
+  const criteriaSummary = getStageCriteriaSummary(item, stage);
   const showFooter =
-    !board || item.status === "paused" || review || item.links.length > 0;
+    !board ||
+    Boolean(item.priority) ||
+    item.status === "paused" ||
+    review ||
+    item.links.length > 0;
 
   return (
     <article
@@ -131,9 +137,19 @@ export function ItemCard({
         <div className="bd-mt-auto bd-flex bd-min-h-7 bd-w-full bd-min-w-0 bd-items-center bd-justify-between bd-gap-2 bd-pt-2">
           <div className="bd-flex bd-min-w-0 bd-flex-wrap bd-items-center bd-gap-1.5">
             {!board && <TypeBadge type={type} />}
+            <PriorityBadge priority={item.priority} />
             {!board && item.status !== "pool" && item.status !== "archived" && (
               <span className="bd-max-w-28 bd-truncate bd-text-xs bd-leading-4 bd-text-muted-foreground">
                 {stage.name}
+              </span>
+            )}
+            {item.status !== "pool" && criteriaSummary.total > 0 && criteriaSummary.done > 0 && (
+              <span
+                className="card-meta bd-inline-flex bd-items-center bd-gap-0.5 bd-text-xs bd-leading-4 bd-text-muted-foreground bd-tabular-nums"
+                title={`本阶段检查项已完成 ${criteriaSummary.done} / ${criteriaSummary.total}`}
+              >
+                <Icon name="checklist" />
+                {criteriaSummary.done}/{criteriaSummary.total}
               </span>
             )}
             {item.status === "paused" && <Badge variant="warning">已暂停</Badge>}
@@ -257,6 +273,38 @@ export function ItemMoreMenu({
           <Icon name="pin" />
           {item.pinned ? "取消置顶" : "置顶事项"}
         </DropdownMenuItem>
+      )}
+      {actions.onSetPriority && (
+        <>
+          <DropdownMenuSeparator />
+          <div className="bd-px-2 bd-pt-1 bd-text-[11px] bd-text-muted-foreground">
+            优先级
+          </div>
+          <div className="bd-grid bd-grid-cols-4 bd-gap-1 bd-px-1.5 bd-py-1">
+            {(
+              [
+                ["high", "重点"],
+                ["medium", "常规"],
+                ["low", "随缘"],
+                [null, "未定"],
+              ] as const
+            ).map(([value, label]) => {
+              const active = (item.priority ?? null) === value;
+              return (
+                <DropdownMenuItem
+                  key={label}
+                  onSelect={() => actions.onSetPriority?.(item, value)}
+                  className={cn(
+                    "bd-h-7 bd-w-auto bd-justify-center bd-px-1.5 bd-text-xs",
+                    active && "bd-bg-muted bd-font-semibold",
+                  )}
+                >
+                  {label}
+                </DropdownMenuItem>
+              );
+            })}
+          </div>
+        </>
       )}
       {item.status === "pool" && actions.onPromote && (
         <DropdownMenuItem onSelect={() => actions.onPromote?.(item)}>

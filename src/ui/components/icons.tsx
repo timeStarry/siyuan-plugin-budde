@@ -17,12 +17,14 @@ import {
   ExternalLink,
   FilePlus2,
   FileText,
+  Flag,
   GripVertical,
   Inbox,
   Kanban,
   LayoutGrid,
   Link,
   List,
+  ListChecks,
   MoreHorizontal,
   Pause,
   Pencil,
@@ -86,6 +88,8 @@ const icons = {
   list: List,
   sortAsc: ArrowUp,
   sortDesc: ArrowDown,
+  flag: Flag,
+  checklist: ListChecks,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = "brand" | keyof typeof icons;

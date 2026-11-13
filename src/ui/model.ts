@@ -1,10 +1,51 @@
-import type { BuddeState, Command, Item, ItemType, NoteLink } from "../core/types";
+import type {
+  BuddeState,
+  Command,
+  Item,
+  ItemPriority,
+  ItemType,
+  NoteLink,
+  Stage,
+} from "../core/types";
 import { DEFAULT_REVIEW_DAYS } from "../core/type-config";
 
 export type ViewMode = "pool" | "active" | "board" | "archive";
 export type CollectionLayout = "grid" | "list";
 export type ActiveFocus = "all" | "review" | "paused" | "completed";
-export type SortMode = "manual" | "updated" | "created" | "review" | "type" | "title";
+export type SortMode =
+  | "manual"
+  | "priority"
+  | "updated"
+  | "created"
+  | "review"
+  | "type"
+  | "title";
+
+const PRIORITY_RANK: Record<ItemPriority, number> = {
+  high: 0,
+  medium: 1,
+  low: 3,
+};
+
+export function priorityRank(priority?: ItemPriority): number {
+  return priority ? PRIORITY_RANK[priority] : 2;
+}
+
+export function getStageCriteriaSummary(item: Item, stage: Stage): {
+  total: number;
+  done: number;
+} {
+  const presetCount = stage.criteria?.length ?? 0;
+  const progress = item.criteriaState?.[stage.id];
+  const validIds = new Set(stage.criteria?.map((c) => c.id) ?? []);
+  const checkedPreset = (progress?.checkedIds ?? []).filter((id) => validIds.has(id)).length;
+  const custom = progress?.custom ?? [];
+  const customDone = custom.filter((c) => c.done).length;
+  return {
+    total: presetCount + custom.length,
+    done: checkedPreset + customDone,
+  };
+}
 
 export interface ViewFilters {
   query: string;
@@ -70,6 +111,12 @@ export function sortItems(
 
   return [...items].sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    if (mode === "priority") {
+      const pa = priorityRank(a.priority);
+      const pb = priorityRank(b.priority);
+      const cmp = asc ? pa - pb : pb - pa;
+      return cmp || a.order - b.order || b.updatedAt.localeCompare(a.updatedAt);
+    }
     if (mode === "updated") {
       const cmp = asc
         ? a.updatedAt.localeCompare(b.updatedAt)

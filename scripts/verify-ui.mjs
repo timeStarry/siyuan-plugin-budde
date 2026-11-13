@@ -58,10 +58,24 @@ try {
   await expect(page.locator('[data-view="pool"]')).toContainText("1");
   await expect(page.locator('[data-view="active"]')).toContainText("2");
 
-  // 3. Open Detail Panel in Pool, edit nextStep & description, link & create SiYuan notes
+  // 3. Open Detail Panel in Pool (floating overlay must NOT shrink .main-panel width), edit priority, nextStep, description, link & create SiYuan notes
+  const mainWidthBefore = await page
+    .locator(".main-panel")
+    .evaluate((el) => Math.round(el.getBoundingClientRect().width));
   await page.locator(".card-open", { hasText: "重新梳理个人知识库标签体系" }).click();
   const detail = page.locator(".detail-pane");
   await expect(detail).toBeVisible();
+  await expect(page.locator('[data-detail-floating="true"]')).toBeVisible();
+  const mainWidthAfter = await page
+    .locator(".main-panel")
+    .evaluate((el) => Math.round(el.getBoundingClientRect().width));
+  expect(mainWidthAfter).toBe(mainWidthBefore);
+
+  // Set Priority in DetailPanel & verify badge on card
+  await detail.getByLabel("优先级").selectOption("high");
+  await expect(
+    page.locator(".item-card", { hasText: "重新梳理个人知识库标签体系" }).locator("[data-priority-badge]"),
+  ).toContainText("重点");
 
   const nextStepInput = detail.getByRole("textbox", { name: "下一步" });
   await nextStepInput.fill("先盘点现有高频目录与孤立文档");
@@ -80,11 +94,11 @@ try {
   await searchResult.click();
   await expect(detail.locator(".notes-section")).toContainText("插件整体架构草稿");
 
-  // One-click create SiYuan outcome doc and verify it opens
+  // One-click create SiYuan outcome doc using type template; matched heading (## 进行中) auto-binds as stage link
   await detail.getByRole("button", { name: "新建文档" }).click();
   await expect(detail.getByLabel("选择思源笔记本")).toHaveValue("nb-product");
   await detail.getByRole("button", { name: "创建并打开" }).click();
-  await expect(detail.locator(".notes-section")).toContainText("思源笔记（2）");
+  await expect(detail.locator(".notes-section")).toContainText("思源笔记（3）");
   expect(await page.evaluate(() => window.openedNotes.length)).toBe(1);
 
   // Test optimistic concurrency conflict banner in Detail Panel
@@ -107,9 +121,14 @@ try {
   await expect(detail.getByRole("alert")).toHaveCount(0);
   await expect(page.locator(".card-title", { hasText: "本地尚未保存的新标题" })).toBeVisible();
 
-  // Click stage timeline in Detail Panel to auto-promote Pool item into "进行中"
-  await detail.locator(".stage-path button", { hasText: "进行中" }).click();
+  // Click stage timeline in Detail Panel to auto-promote Pool item into "进行中" & see auto-bound stage link
+  await detail.locator(".stage-path > ol > li > button", { hasText: "进行中" }).click();
   await expect(detail).toContainText("推进中");
+  await expect(detail.locator(".stage-path").getByRole("button", { name: "解除阶段绑定：进行中" })).toBeAttached();
+
+  // Test wide-screen canvas click closes the floating drawer cleanly
+  await page.locator('[data-budde-shell="main"]').click({ position: { x: 24, y: 24 } });
+  await expect(detail).toHaveCount(0);
 
   // 4. Board View: type switcher, stage columns, Ghost Column, stage move & batch archive
   await page.locator('[data-view="board"]').click();
@@ -135,9 +154,18 @@ try {
   await ghostInput.press("Enter");
   await expect(page.locator(".stage-column")).toHaveCount(6);
 
-  // Open project card in Detail & take 1440x900 Light & Dark screenshots
+  // Open project card in Detail, check stage criteria + add custom criterion & take 1440x900 Light & Dark screenshots
   await page.locator(".card-open", { hasText: "实现思源文档双向关联搜索" }).click();
-  await detail.locator(".stage-path button", { hasText: "原型实现" }).click();
+  await detail.locator(".stage-path > ol > li > button", { hasText: "原型实现" }).click();
+  const firstCriterion = detail.locator('.stage-path [role="checkbox"]').first();
+  await expect(firstCriterion).toBeVisible();
+  await firstCriterion.click();
+  await expect(firstCriterion).toHaveAttribute("aria-checked", "true");
+  await detail.getByRole("button", { name: "添加本阶段检查项" }).click();
+  const customCriterionInput = detail.getByLabel("新增本阶段专属检查项");
+  await customCriterionInput.fill("确认抽屉悬浮体验流畅");
+  await customCriterionInput.press("Enter");
+  await expect(detail.locator(".stage-path")).toContainText("确认抽屉悬浮体验流畅");
   await page.screenshot({ path: `${qaDir}/workbench-1440-light.png`, animations: "disabled" });
 
   await page.evaluate(() => {
@@ -149,7 +177,7 @@ try {
   });
 
   // Move project item to completed stage ("已发布") and batch archive completed
-  await detail.locator(".stage-path button", { hasText: "已发布" }).click();
+  await detail.locator(".stage-path > ol > li > button", { hasText: "已发布" }).click();
   await page.keyboard.press("Escape");
   await expect(detail).toHaveCount(0);
 
@@ -169,12 +197,49 @@ try {
   await page.getByRole("button", { name: /已暂停/ }).click();
   await expect(page.locator(".item-card", { hasText: "支持快捷键一键捕获想法" })).toBeVisible();
 
-  // 6. Settings Modal: create custom type, adjust reviewDays, and delete type with migration
+  // 6. Settings Modal: stage criteria editing, template extraction from SiYuan doc, create custom type & import/export check
   await page.getByRole("button", { name: "管理类型与阶段" }).click();
   const settingsModal = page.locator('[data-budde-modal="true"]');
   await expect(settingsModal).toBeVisible();
   // Host document.body must never be made inert or scroll-locked
   expect(await page.evaluate(() => Boolean(document.body.inert))).toBe(false);
+
+  // Edit stage criteria & extract template from SiYuan doc on active type
+  await settingsModal.getByRole("button", { name: /^准出项：/ }).first().click();
+  const addCritInput = settingsModal.getByPlaceholder("输入阶段准出检查项，按回车添加…");
+  await addCritInput.fill("验证模板与准出协同");
+  await addCritInput.press("Enter");
+  await expect(settingsModal).toContainText("验证模板与准出协同");
+  await settingsModal.getByRole("button", { name: "从思源文档提取…" }).click();
+  await settingsModal.locator("button", { hasText: "插件整体架构草稿" }).click();
+  await expect(settingsModal.locator("#budde-type-doc-template")).toHaveValue(/插件整体架构草稿/);
+  await settingsModal.getByRole("button", { name: "保存模板" }).click();
+  await expect(settingsModal.getByRole("button", { name: "导出此类型" })).toBeVisible();
+
+  await settingsModal.getByLabel("导入类型包文件").setInputFiles({
+    name: "imported-pack.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        product: "BuddeTypePack",
+        schemaVersion: 1,
+        exportedAt: "2026-11-13T00:00:00.000Z",
+        type: {
+          name: "导入实践",
+          icon: "FlaskConical",
+          color: "emerald",
+          reviewDays: 21,
+          docTemplate: "# {{title}}\n\n## 验证\n",
+          initialStageIndex: 0,
+          stages: [
+            { name: "探索", completed: false, criteria: ["列出问题"] },
+            { name: "完成", completed: true },
+          ],
+        },
+      }),
+    ),
+  });
+  await expect(settingsModal.getByRole("button", { name: "导入实践", exact: true })).toBeVisible();
 
   await settingsModal.getByRole("button", { name: "新建类型" }).click();
   await settingsModal.getByPlaceholder(/读书/).fill("专题研究");
@@ -244,6 +309,15 @@ try {
   await expect(page.getByRole("button", { name: "按类型排序" }).locator('[data-icon="sortAsc"]')).toBeVisible();
   await page.getByRole("button", { name: "按类型排序" }).click();
   await expect(page.getByRole("button", { name: "按类型排序" }).locator('[data-icon="sortDesc"]')).toBeVisible();
+  await page.getByRole("button", { name: "按优先级排序" }).click();
+  await expect(page.getByRole("button", { name: "按优先级排序" }).locator('[data-icon="sortAsc"]')).toBeVisible();
+  // Clicking another row while floating drawer is open switches selection directly
+  await page.locator("[data-list-row]").nth(0).click();
+  await expect(detail).toBeVisible();
+  await page.locator("[data-list-row]").nth(1).click();
+  await expect(detail).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(detail).toHaveCount(0);
 
   await page.setViewportSize({ width: 360, height: 740 });
   const listNarrowOverflow = await page.evaluate(
